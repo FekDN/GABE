@@ -42,13 +42,13 @@ The key insight was to stop guessing the basis and instead **extract the optimal
 Each weight tensor `W` was treated as a single point in a high-dimensional space. Principal Component Analysis (PCA) / Singular Value Decomposition (SVD) was applied to the entire collection of such points.
 
 This yielded an exact analytical representation:
-$$
-\[
-\boxed{
-W^{(l)} = \bar{W} + \sum_{k=1}^{K} c_{l,k} \cdot B_k
-}
-\]
-$$
+
+ $$
+ W^{(l)} = \bar{W} + \sum_{k=1}^{K} c_{l,k} \cdot B_k
+ $$
+
+(W⁽ˡ⁾ = W̄ + ∑ₖ₌₁ᴷ cₗ,ₖ · Bₖ)
+
 Where:
 
 - `W^(l)` — the weight tensor of layer `l`.
