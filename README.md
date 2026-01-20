@@ -24,6 +24,8 @@ Weight tensors were grouped by functional role and shape to isolate semantically
 All methods were evaluated on identical weight groups under consistent memory form-factor assumptions and using the same set of metrics.
 
 ---
+![Test results](test.jpg)
+---
 
 ## 2. Key Findings
 
