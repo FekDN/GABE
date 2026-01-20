@@ -126,6 +126,65 @@ def compress_decompress_block_fp8(tensor: torch.Tensor, block_size: int = 128) -
     size = num_elements * 1 + scales.numel() * 2
     return reconstructed_tensor, size
 
+def compress_decompress_icq(tensor: torch.Tensor, bits: int = 4, group_size: int = 128):
+    """
+    Performs iterative column-wise quantization with error compensation (simplified GPTQ).
+    """
+    original_shape = tensor.shape
+    if len(original_shape) != 2:
+        raise ValueError("ICQ is implemented only for 2D tensors (matrices).")
+
+    W = tensor.clone().to(torch.float32)
+    rows, cols = W.shape
+    
+    Q = torch.zeros_like(W, dtype=torch.int8)
+    metas = []
+
+    # A tensor for error accumulation. Initially, the error is added to the entire matrix.
+    Err = torch.zeros((rows, 1), device=W.device)
+    
+    # Iterate over columns with group_size increments
+    for j in range(0, cols, group_size):
+        current_cols_idx = range(j, min(j + group_size, cols))
+        
+        # 1. Select the current column group
+        W_group = W[:, current_cols_idx]
+
+        # 2. Add the accumulated error to the current group
+        # Use broadcasting to add an error vector to each column of the group
+        W_group += Err
+
+        # 3. Quantize the group
+        q_group, scale, zp = quantize_tensor(W_group, bits=bits)
+        
+        # 4. Preserving quantized values ​​and metadata
+        Q[:, current_cols_idx] = q_group
+        metas.append({'scale': scale, 'zp': zp})
+
+        # 5. Dequantize the group to calculate the error
+        W_hat_group = dequantize_tensor(q_group, scale, zp)
+        
+        # 6. Calculate the error for this group
+        group_err = W_group - W_hat_group
+        
+        # 7. Simple ("lazy") update error
+        # Average the error across rows and add it to the accumulated error vector
+        Err += torch.mean(group_err, dim=1, keepdim=True)
+
+    # Restoration and size calculation
+    reconstructed_tensor = torch.zeros_like(W)
+    for i, meta in enumerate(metas):
+        start_col = i * group_size
+        end_col = min(start_col + group_size, cols)
+        q_group = Q[:, start_col:end_col]
+        reconstructed_tensor[:, start_col:end_col] = dequantize_tensor(q_group, meta['scale'], meta['zp'])
+        
+    num_elements = tensor.numel()
+    num_groups = len(metas)
+    size = num_elements * (bits / 8) + num_groups * 8
+    
+    return reconstructed_tensor.to(tensor.dtype), size
+
 def compress_decompress_grouped_quant(tensor: torch.Tensor, group_size: int = 64, bits: int = 4) -> Tuple[torch.Tensor, int]:
     """Performs Grouped Quantization (GQ)."""
     original_shape = tensor.shape
@@ -559,6 +618,19 @@ def compare_methods(group_name: str, weights_list: List[torch.Tensor]):
     mse = torch.mean(error.pow(2)).item()
     cr = original_size_bytes / total_size if total_size > 0 else 0
     print(f"{f'21. Sparse SVD (Proxy) {int(SPARSITY*100)}%':<40} | {format_bytes(int(total_size)):9} | {cr:8.2f}x | {mse:9.2e} | {math.sqrt(mse):9.2e} | {torch.mean(torch.abs(error)).item():9.2e} | {10 * math.log10(signal_variance / mse):9.1f}")
+
+    # Method 22: Iterative Column Quantization (ICQ, simplified GPTQ)
+    rec_list, total_size = [], 0
+    # ICQ is applied per-tensor, as it's a layer-wise method
+    for tensor in weights_list:
+        rec, size = compress_decompress_icq(tensor, group_size=128, bits=4)
+        rec_list.append(rec)
+        total_size += size
+    reconstructed = torch.stack(rec_list)
+    error = original_stacked - reconstructed
+    mse = torch.mean(error.pow(2)).item()
+    cr = original_size_bytes / total_size if total_size > 0 else 0
+    print(f"{'22. ICQ-int4 (Lazy GPTQ, G=128)':<40} | {format_bytes(int(total_size)):9} | {cr:8.2f}x | {mse:9.2e} | {math.sqrt(mse):9.2e} | {torch.mean(torch.abs(error)).item():9.2e} | {10 * math.log10(signal_variance / mse):9.1f}")
 
     print("-" * len(header))
 
