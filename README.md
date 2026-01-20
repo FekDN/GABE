@@ -1,5 +1,5 @@
 # A Comparative Analysis of Weight Compression Methods
-An empirical study of 21 weight tensor compression methods revealed universal principles across diverse neural network architectures (Transformer and Convolutional) and enabled the formulation of quantitatively justified recommendations.
+An empirical study of 22 weight tensor compression methods revealed universal principles across diverse neural network architectures (Transformer and Convolutional) and enabled the formulation of quantitatively justified recommendations.
 
 ---
 
