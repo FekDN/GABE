@@ -12,7 +12,6 @@ We introduce **GABE** (Groupwise Affine Basis Encoding) — a decomposition meth
 
 We demonstrate that these coefficients $\alpha_i$ are **not static** but can be accurately predicted from the input via a small router network (Pearson $r = 0.927$). Comprehensive experiments on ResNet-18, Stable Diffusion, and synthetic tasks reveal:
 
-- **4–10× compression** with minimal quality loss
 - **Skill transfer** by copying only stable components between models
 - **Dynamic input-dependent weights outperform static models** (98.2% vs 72.0% accuracy)
 - **Coefficients form semantically meaningful clusters** in coefficient space
