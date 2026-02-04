@@ -367,6 +367,7 @@ Epoch 200:  Loss = 0.000000 (converged)
 <div align="center">
 <img src="scale.jpg" alt="Stable Diffusion Perturbation Study" width="100%"/>
 </div>
+
 **Quantitative summary:**
 - Coefficients are **~4× more fragile** than $\overline{W}$
 - This precisely matches the "broken pointer" analogy:
@@ -392,7 +393,7 @@ Epoch 500: Recon Loss = 0.0097 | Coeff MSE = 0.0015 (converged)
 **Final metrics:**
 - Reconstruction Loss: **0.0097**
 - Coefficient MSE: **0.0015**
-- **Pearson correlation: 0.9272** ⭐
+- **Pearson correlation: 0.9272**
 
 **Test set (generalization):** Loss = 0.1959
 
@@ -614,6 +615,7 @@ $$W_i = \overline{W} + \sum_k \alpha_i[k] \cdot B_k$$
 $$\text{Size} = L \times d_1 \times d_2 \times 4 \text{ bytes (fp32)}$$
 
 **GABE storage:**
+
 $$\text{Size} = \underbrace{d_1 \times d_2 \times 1}_{\overline{W} \text{ int8}} + \underbrace{K \times d_1 \times d_2 \times 2}_{B_k \text{ fp16}} + \underbrace{L \times K \times 2}_{\alpha_i \text{ fp16}}$$
 
 **With dynamic Router:**
@@ -660,8 +662,8 @@ $$\text{GABE: } \text{ModelSize} + N \times \text{CoeffSize}$$
 - Traditional: $10 \times 44$ MB = 440 MB
 - GABE: $44 + 10 \times 0.5$ MB = 49 MB
 - **Savings: 9×**
-
-**Switching tasks:** $\text{model.load\_coeffs(task\_id)}$ — instant, no retraining.
+  
+**Switching tasks:** $\text{model.load coeffs(task id)}$ — instant, no retraining.
 
 ### 6.4 Continual Learning without Forgetting
 
@@ -758,7 +760,7 @@ We have demonstrated that modern neural networks are not collections of independ
 
 ### 7.2 Future Directions
 
-**Immediate (1-3 months):**
+**Immediate:**
 
 1. **LLM Application**
    - Apply GABE to LLaMA/Mistral attention and FFN layers
@@ -775,7 +777,7 @@ We have demonstrated that modern neural networks are not collections of independ
    - Applications: style transfer, concept mixing, fine-grained control
    - Compare to: LoRA, textual inversion, prompt engineering
 
-**Medium-term (6-12 months):**
+**Medium-term:**
 
 4. **MANet Architecture Optimization**
    - Hyperparameter search: basis count, Router architecture, compression ranks
@@ -792,7 +794,7 @@ We have demonstrated that modern neural networks are not collections of independ
    - Hypothesis: Winners have cleaner coefficient patterns
    - Application: Use GABE to search for lottery tickets
 
-**Long-term (1-2 years):**
+**Long-term:**
 
 7. **Unified Theory of Weight Sharing**
    - Formal connection: GABE ↔ Universal Subspace Hypothesis ↔ Model Merging
