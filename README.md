@@ -1,24 +1,24 @@
-# GABE: Groupwise Affine Basis Encoding  
+# GABE: Groupwise Affine Basis Encoding
 # Neural Networks as Memory-Addressed Systems
 
-**Dmitry Feklin** (FeklinDN@gmail.com)  
+**Dmitry Feklin** (FeklinDN@gmail.com)
 **February 2026**
 
 ---
 
 ## Abstract
 
-We introduce **GABE** (Groupwise Affine Basis Encoding) — a decomposition method that represents neural network weights as an **addressable memory system**. For any group of similar layers, we extract three interpretable components: (1) a shared mean weight $\overline{W}$ (long-term memory), (2) a low-rank basis of variations (address space), and (3) per-layer coefficients $\alpha_i$ (pointers).
+We introduce **GABE** (Groupwise Affine Basis Encoding)—a decomposition method that represents neural network weights as an **addressable memory system**. For any group of similar layers, we extract three interpretable components: (1) a shared mean weight $\overline{W}$ (long-term memory), (2) a low-rank basis of variations (address space), and (3) per-layer coefficients $\alpha_i$ (pointers).
 
 We demonstrate that these coefficients $\alpha_i$ are **not static** but can be accurately predicted from the input via a small router network (Pearson $r = 0.927$). Comprehensive experiments on ResNet-18, Stable Diffusion, and synthetic tasks reveal:
 
-- **Skill transfer** by copying only stable components between models
-- **Dynamic input-dependent weights outperform static models** (98.2% vs 72.0% accuracy)
-- **Coefficients form semantically meaningful clusters** in coefficient space
+- **Skill transfer** by copying only stable components between models.
+- **Dynamic input-dependent weights outperform static models** (98.2% vs 72.0% accuracy), demonstrating the power of adaptive processing.
+- **Coefficients form semantically meaningful clusters** in a learned representation space.
 
-GABE provides both a practical tool for compression, transfer learning, and continual learning, and a new theoretical lens: modern neural networks operate as **memory-addressed computers** rather than collections of independent weights.
+GABE provides both a practical framework for transfer learning and continual learning, and a new theoretical lens: modern neural networks operate as **memory-addressed computers** that retrieve and combine knowledge, rather than as collections of independent weights. This perspective also outlines a clear strategy for significant model optimization.
 
-**Keywords:** weight decomposition, memory-addressed networks, model compression, skill transfer, weight-space editing, continual learning
+**Keywords:** weight decomposition, memory-addressed networks, model optimization, skill transfer, weight-space editing, continual learning
 
 ---
 
@@ -29,9 +29,9 @@ GABE provides both a practical tool for compression, transfer learning, and cont
 Modern deep neural networks contain billions of parameters, creating severe challenges:
 
 - **Extreme memory requirements**: GPT-3 (~350 GB), Stable Diffusion (~5 GB)
-- **Difficult transfer learning**: full model retraining often required
-- **Catastrophic forgetting** in continual learning scenarios
-- **Limited understanding** of how knowledge is internally organized
+- **Difficult transfer learning**: full model retraining is often inefficient.
+- **Catastrophic forgetting** in continual learning scenarios.
+- **Limited understanding** of how knowledge is internally organized.
 
 Traditional approaches treat each layer's weights as independent parameters, leading to redundancy and inefficiency. We challenge this assumption.
 
@@ -52,11 +52,11 @@ This formulation draws inspiration from computer architecture: weights are "read
 
 ### 1.3 Contributions
 
-1. **Mathematical formalization** of GABE decomposition with addressable memory interpretation
-2. **Empirical proof** of component stability hierarchy through perturbation experiments
-3. **Discovery** that coefficients are a **predictable function of input** ($r = 0.927$)
-4. **New architecture**: Memory-Addressed Networks (MANet) with dynamic, input-dependent weights
-5. **Practical applications**: demonstrated 4-10× compression, efficient skill transfer, and continual learning without forgetting
+1. **Mathematical formalization** of GABE decomposition with an addressable memory interpretation.
+2. **Empirical proof** of a component stability hierarchy through systematic perturbation experiments.
+3. **Discovery** that coefficients are a **predictable function of input** ($r = 0.927$).
+4. **A new architectural paradigm**: Memory-Addressed Networks (MANet) with dynamic, input-dependent weights.
+5. **Practical applications**: demonstrated efficient skill transfer, a solution for continual learning without forgetting, and a new pathway for model optimization.
 
 ---
 
@@ -68,7 +68,7 @@ For a group of $L$ similar layers $\{W_1, \dots, W_L\}$ (e.g., all Conv2d layers
 
 **Algorithm:**
 
-1. **Compute mean weight**: 
+1. **Compute mean weight**:
    $$\overline{W} = \frac{1}{L}\sum_{i=1}^L W_i$$
 
 2. **Center and stack**:
@@ -77,32 +77,23 @@ For a group of $L$ similar layers $\{W_1, \dots, W_L\}$ (e.g., all Conv2d layers
 3. **Apply SVD** to the stacked centered weights:
    $$[\Delta W_1, \Delta W_2, \dots, \Delta W_L] = U \Sigma V^T$$
 
-4. **Extract basis**: First $K = L-1$ right singular vectors form basis $\{B_1, \dots, B_K\}$
+4. **Extract basis**: First $K = L-1$ right singular vectors form the basis $\{B_1, \dots, B_K\}$.
 
-5. **Compute coefficients**: 
+5. **Compute coefficients**:
    $$\alpha_i = U_i \cdot \Sigma_i$$
-   
+
 6. **Reconstruction**:
    $$W_i \approx \overline{W} + \sum_{k=1}^K \alpha_i[k] \cdot B_k$$
 
-### 2.2 Low-Rank Compression
+### 2.2 A Pathway to Optimization
 
-Each component is further compressed via rank-$r$ SVD approximation plus residuals:
+GABE naturally provides a strategy for model optimization. Instead of storing $L$ large, redundant weight matrices, one can store the shared components ($\overline{W}$ and $B_k$) only once. The per-layer information is then reduced to the small set of coefficients, $\alpha_i$.
 
-$$
-\overline{W} = U_r S_r V_r^T + R_{\overline{W}}
-$$
-$$
-B_k = U_r^{(k)} S_r^{(k)} V_r^{(k)T} + R_{B_k}
-$$
+This separation enables two optimization pathways:
+1. **Static Compression**: Store the shared $\overline{W}$ and $B_k$ and the small set of coefficients for each of the $L$ layers. This already reduces redundancy by factoring out the common knowledge base.
+2. **Dynamic Generation**: Store only the shared $\overline{W}$ and $B_k$, and replace all per-layer coefficients with a single, compact Router network that generates them on-the-fly from the input. As we show in Experiment 5, this is not only possible but highly effective.
 
-where $r \ll \text{rank}(\overline{W})$.
-
-**Storage requirements:**
-- Original: $L \times d_1 \times d_2 \times 4$ bytes (fp32)
-- GABE: $(U_r S_r V_r)_{\overline{W}}$ (int8) + $(U_r S_r V_r)_{B_k}$ (fp16) + residuals (int8) + coefficients (fp16)
-
-Empirically: **4-10× compression** on ResNet and Stable Diffusion.
+This reframes optimization from a problem of compressing individual weights to one of efficiently representing a shared knowledge base and a lightweight addressing mechanism.
 
 ### 2.3 Interpretation as Addressable Memory
 
@@ -115,9 +106,9 @@ Empirically: **4-10× compression** on ResNet and Stable Diffusion.
 
 **Read operation:**
 ```python
-def read_weights(layer_id, coeffs):
+def read_weights(coeffs):
     """Read weights from shared memory using pointers"""
-    result = W_bar.copy()  # Base memory
+    result = W_bar.clone()  # Base memory
     for k in range(K):
         address = Basis[k]      # Where to read
         strength = coeffs[k]    # How strongly
@@ -125,9 +116,8 @@ def read_weights(layer_id, coeffs):
     return result
 ```
 
-**Key insight from experiments (Section 4.5):**  
-Damaged coefficients = reading from wrong addresses → immediate catastrophic failure.  
-This is exactly the behavior of broken pointers causing segmentation faults.
+**Key insight from experiments (Section 4.4):**
+Damaged coefficients are analogous to broken pointers causing segmentation faults, leading to immediate catastrophic failure. This strongly supports the memory system analogy.
 
 ### 2.4 Related Work
 
@@ -191,18 +181,7 @@ We conducted six complementary experiments to validate our hypothesis from multi
 
 **Implication:** If high $R^2$, we can store only stable coefficients and generate unstable ones on demand.
 
-### Experiment 4: MLP-Based Coefficient Predictor (GABEtest5)
-
-**Objective:** Train a neural network to predict unstable coefficients from stable ones.
-
-**Procedure:**
-1. Collect dataset: pairs of (stable_coeffs, unstable_coeffs) across multiple batches
-2. Train MLP: $\text{coeffs}_{\text{unstable}} = \text{MLP}(\text{coeffs}_{\text{stable}})$
-3. Measure final $R^2$ and MSE
-
-**Expected outcome:** $R^2 > 0.7$ would confirm that unstable coefficients can be generated rather than stored.
-
-### Experiment 5: Perturbation Study on Stable Diffusion (Critical Experiment)
+### Experiment 4: Perturbation Study on Stable Diffusion (Critical Experiment)
 
 **Objective:** Understand the **role and fragility** of each GABE component in generative models.
 
@@ -221,13 +200,13 @@ We conducted six complementary experiments to validate our hypothesis from multi
 
 **Prediction:** Coefficients should be most fragile (broken pointers → crash), basis intermediate, $\overline{W}$ most robust (data corruption → gradual degradation).
 
-### Experiment 6: Router Training (GABEtest7) — Core Validation
+### Experiment 5: Router Training (GABEtest6) — Core Validation
 
 **Objective:** Prove that coefficients are a **function of input**.
 
 This experiment comprises three sub-tests:
 
-#### Test 6.1: Synthetic Memory-Addressing Task
+#### Test 5.1: Synthetic Memory-Addressing Task
 
 **Setup:**
 - Create 10 "concepts" (random 64-dimensional vectors)
@@ -246,7 +225,7 @@ This experiment comprises three sub-tests:
 
 **Success criterion:** $r > 0.8$ would strongly support addressable memory hypothesis.
 
-#### Test 6.2: Static vs. Dynamic Architecture Comparison
+#### Test 5.2: Static vs. Dynamic Architecture Comparison
 
 **Setup:**
 - Classification task (10 classes, 500 samples)
@@ -265,7 +244,7 @@ This experiment comprises three sub-tests:
 
 **Hypothesis:** Dynamic model should achieve higher accuracy if input-dependent routing is beneficial.
 
-#### Test 6.3: Coefficient Space Visualization
+#### Test 5.3: Coefficient Space Visualization
 
 **Setup:**
 - Binary classification with 2D input (for easy visualization)
@@ -333,23 +312,7 @@ All tensors correctly restored via GABE. **Conclusion:** Skill transfer via coef
 - Store only stable coefficients + small predictor network (~100 KB MLP)
 - Generate unstable coefficients on demand
 
-### 4.4 MLP Predictor (Experiment 4)
-
-**Training dynamics:**
-```
-Epoch  50:  Loss = 0.4384
-Epoch 100:  Loss = 0.0021
-Epoch 150:  Loss = 0.000009
-Epoch 200:  Loss = 0.000000 (converged)
-```
-
-**Final $R^2$:** 0.8049
-
-**Interpretation:** Strong predictor performance confirms structural dependency between coefficient groups. This enables:
-1. Compression: replace stored unstable coefficients with compact generator
-2. Fast adaptation: adjust only stable coefficients, unstable follow automatically
-
-### 4.5 Stable Diffusion Perturbation Study (Experiment 5) — **Most Striking Result**
+### 4.4 Stable Diffusion Perturbation Study (Experiment 5) — **Most Striking Result**
 
 **Hierarchy of component fragility:**
 
@@ -366,18 +329,13 @@ Epoch 200:  Loss = 0.000000 (converged)
 <img src="scale.jpg" alt="Stable Diffusion Perturbation Study" width="100%"/>
 </div>
 
-**Quantitative summary:**
-- Coefficients are **~4× more fragile** than $\overline{W}$
-- This precisely matches the "broken pointer" analogy:
-  - Corrupting data in RAM → gradual degradation
-  - Rearranging memory blocks → reading wrong data but structure intact
-  - Corrupting pointers → **segmentation fault** → immediate crash
+**Interpretation:** The extreme fragility of coefficients (~4× more than the basis) provides the most intuitive and powerful evidence for the "broken pointer" analogy. Corrupting the model's core knowledge ($\overline{W}$) leads to graceful degradation, while corrupting its ability to *access* that knowledge ($\alpha_i$) leads to immediate system failure.
 
 **Visual confirmation:** All generated images matched prompt semantics when intact, but coefficients corruption destroyed this relationship fastest.
 
-### 4.6 Router Training (Experiment 6) — **Core Validation of Hypothesis**
+### 4.5 Router Training (Experiment 6) — **Core Validation of Hypothesis**
 
-#### Test 6.1: Synthetic Task
+#### Test 5.1: Synthetic Task
 
 **Training curves:**
 ```
@@ -415,7 +373,7 @@ Correlation: 0.93
 - If coefficients were random noise, correlation would be ~0
 - Router successfully learned the addressing mechanism
 
-#### Test 6.2: Architecture Comparison
+#### Test 5.2: Architecture Comparison
 
 **Fixed model (static weights):**
 ```
@@ -454,7 +412,7 @@ Mean std: 0.474
 
 **Conclusion:** Dynamic routing via input-dependent coefficients provides **26% absolute improvement** over static weights.
 
-#### Test 6.3: Visualization
+#### Test 5.3: Visualization
 
 **Training:** Converged to 100% accuracy within 100 epochs.
 
@@ -607,24 +565,8 @@ $$W_i = \overline{W} + \sum_k \alpha_i[k] \cdot B_k$$
 
 ## 6. Practical Applications
 
-### 6.1 Model Compression
-
-**Traditional storage:**
-$$\text{Size} = L \times d_1 \times d_2 \times 4 \text{ bytes (fp32)}$$
-
-**GABE storage:**
-
-$$\text{Size} = \underbrace{d_1 \times d_2 \times 1}_{\overline{W} \text{ int8}} + \underbrace{K \times d_1 \times d_2 \times 2}_{B_k \text{ fp16}} + \underbrace{L \times K \times 2}_{\alpha_i \text{ fp16}}$$
-
-**With dynamic Router:**
-$$\text{Size} = \overline{W} + B_k + \underbrace{\text{Router parameters}}_{\sim 50 \text{ KB MLP}}$$
-
-**Empirical results (ResNet-18 Conv2d group):**
-- Original: 10.48 MB
-- GABE: 2.62 MB → **4.0× compression**
-- GABE + Router: 2.57 MB → **4.08× compression** (coefficients generated on-the-fly)
-
-**Expected scaling:** For models with hundreds of layers (LLMs), compression ratio could reach **10-100×**.
+### 6.1 Model Optimization and Compression
+GABE presents a powerful strategy for model optimization. Instead of storing a large number of redundant layers, a GABE-based model stores the shared knowledge base ($\overline{W}$ and $B_k$) only once. The per-layer specificity is then handled either by storing the compact coefficients or, even more efficiently, by a small Router network that generates them on-demand. This approach replaces parameter redundancy with a compact, reusable knowledge base and an efficient generation mechanism, offering a clear path toward significant reductions in model size.
 
 ### 6.2 Efficient Transfer Learning
 
@@ -716,7 +658,7 @@ class MANetLayer(nn.Module):
 - **Adaptivity**: Weights adjust automatically to input
 - **Interpretability**: Coefficients show "what the layer is reading"
 
-**Empirical validation (Test 6.2):** MANet achieved **98.2%** accuracy vs. **72.0%** for static baseline.
+**Empirical validation (Test 5.2):** MANet achieved **98.2%** accuracy vs. **72.0%** for static baseline.
 
 ### 6.6 Weight-Space Editing
 
@@ -751,7 +693,7 @@ We have demonstrated that modern neural networks are not collections of independ
 - Coefficients form **semantically meaningful clusters**
 
 **Practical impact:**
-- **Compression**: 4-10× (up to 100× with Router)
+- **Optimization**: A new strategy to reduce redundancy by storing a shared memory and a compact addressing mechanism.
 - **Transfer learning**: Copy memory, retrain pointers
 - **Multi-task**: $O(N)$ memory scaling
 - **Continual learning**: Zero forgetting by freezing memory
@@ -846,9 +788,8 @@ GABE/
 ├── GABEtest2.py         # Correlation analysis
 ├── GABEtest3.py         # Skill transfer
 ├── GABEtest4.py         # Coefficient dependency
-├── GABEtest5.py         # MLP predictor
-├── GABEtest6.py         # Stable Diffusion fragility test
-├── GABEtest7.py         # Router training (all 3 sub-tests)
+├── GABEtest5.py         # Stable Diffusion fragility test
+├── GABEtest6.py         # Router training (all 3 sub-tests)
 └── README.md            # Setup and reproduction instructions
 ```
 
