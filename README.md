@@ -863,12 +863,4 @@ FeklinDN@gmail.com
 February 2026
 
 **License:** Apache 2.0  
-**Citation:**
-```bibtex
-@article{feklin2026gabe,
-  title={GABE: Neural Networks as Memory-Addressed Systems},
-  author={Feklin, Dmitry},
-  journal={arXiv preprint},
-  year={2026}
-}
-```
+
