@@ -503,7 +503,7 @@ Mean std: 0.474
    - Dynamic routing allows model to adapt its "reading strategy" per input
 
 4. **Semantic structure in coefficient space**
-   - Different classes/tasks map to distinct regions (Figure 2)
+   - Different classes/tasks map to distinct regions (Figure 3)
    - Clean linear separation emerges without explicit supervision
    - Coefficients encode task-relevant information beyond mere classification logits
 
