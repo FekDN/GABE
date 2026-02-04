@@ -362,8 +362,11 @@ Epoch 200:  Loss = 0.000000 (converged)
 | $\alpha_i$ (coeffs) | **0.15** | **0.35** | **Rapid corruption**, barely recognizable at 0.15 |
 | All (affine) | **0.0** | **0.0** | **Immediate catastrophic failure** → pure noise |
 
-<img src="scale.jpg" alt="Stable Diffusion Perturbation Study" width="100%"/>
+**Figure 1** shows hierarchy of component fragility:
 
+<div align="center">
+<img src="scale.jpg" alt="Stable Diffusion Perturbation Study" width="100%"/>
+</div>
 **Quantitative summary:**
 - Coefficients are **~4× more fragile** than $\overline{W}$
 - This precisely matches the "broken pointer" analogy:
@@ -400,12 +403,12 @@ Predicted coefficients: [0.126, 0.062, 0.031, 0.088, 0.202]
 Correlation: 0.93
 ```
 
-**Figure 1** shows training dynamics:
+**Figure 2** shows training dynamics:
 
 <div align="center">
 <img src="coeffs_addressing_test.png" alt="Router Training Curves" width="100%"/>
 
-**Figure 1:** Router training curves. Left: Reconstruction loss (how well patterns are restored). Right: Coefficient MSE (how accurately pointers are predicted). Both converge smoothly, demonstrating that coefficients are learnable functions of input.
+**Figure 2:** Router training curves. Left: Reconstruction loss (how well patterns are restored). Right: Coefficient MSE (how accurately pointers are predicted). Both converge smoothly, demonstrating that coefficients are learnable functions of input.
 </div>
 
 **Interpretation:** 
@@ -456,12 +459,12 @@ Mean std: 0.474
 
 **Training:** Converged to 100% accuracy within 100 epochs.
 
-**Figure 2** shows the transformation from input space to coefficient space:
+**Figure 3** shows the transformation from input space to coefficient space:
 
 <div align="center">
 <img src="coeffs_space_visualization.png" alt="Coefficient Space Visualization" width="100%"/>
 
-**Figure 2:** Visualization of input space (left) vs. coefficient space (center: 2D, right: 3D). Classes are perfectly separated in coefficient space, demonstrating that coefficients encode semantic task structure. The two classes form distinct linear trajectories in coefficient space, suggesting that Router has learned to map input semantics to distinct "addressing patterns" in memory.
+**Figure 3:** Visualization of input space (left) vs. coefficient space (center: 2D, right: 3D). Classes are perfectly separated in coefficient space, demonstrating that coefficients encode semantic task structure. The two classes form distinct linear trajectories in coefficient space, suggesting that Router has learned to map input semantics to distinct "addressing patterns" in memory.
 </div>
 
 **Observations:**
