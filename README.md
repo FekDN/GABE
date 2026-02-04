@@ -356,8 +356,8 @@ Epoch 200:  Loss = 0.000000 (converged)
 
 | Component | First Visible Effect | Total Breakdown | Behavior |
 |-----------|---------------------|-----------------|----------|
-| $\overline{W}$ (w_bar) | 0.60 | >1.5 | Gradual detail changes, **semantics preserved** |
-| $B_k$ (basis) | 0.35 | 1.0–1.5 | Small detail alterations, structure remains |
+| $\overline{W}$ (w_bar) | 1.00 | >1.5 | Gradual detail changes, **semantics preserved** |
+| $B_k$ (basis) | 0.60 | 1.0–1.5 | Small detail alterations, structure remains |
 | $\alpha_i$ (coeffs) | **0.15** | **0.35** | **Rapid corruption**, barely recognizable at 0.15 |
 | All (affine) | **0.0** | **0.0** | **Immediate catastrophic failure** → pure noise |
 
