@@ -333,7 +333,6 @@ All tensors correctly restored via GABE. **Conclusion:** Skill transfer via coef
 **Practical significance:**
 - Store only stable coefficients + small predictor network (~100 KB MLP)
 - Generate unstable coefficients on demand
-- **Memory savings: ~50%**
 
 ### 4.4 MLP Predictor (Experiment 4)
 
