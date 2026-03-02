@@ -1,842 +1,592 @@
 # GABE: Groupwise Affine Basis Encoding
-# Neural Networks as Memory-Addressed Systems
+### Neural Networks as Memory-Addressed Systems
 
-**Dmitry Feklin** (FeklinDN@gmail.com)
-**February 2026**
+**Dmitry Feklin** · FeklinDN@gmail.com · February 2026
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-orange)](https://pytorch.org/)
+
+---
+
+## Table of Contents
+
+- [Abstract](#abstract)
+- [Core Idea](#core-idea)
+- [Decomposition Algorithm](#decomposition-algorithm)
+- [Experiments & Results](#experiments--results)
+- [Practical Applications](#practical-applications)
+- [Limitations & Open Questions](#limitations--open-questions)
+- [Installation & Reproduction](#installation--reproduction)
+- [Citation](#citation)
 
 ---
 
 ## Abstract
 
-We introduce **GABE** (Groupwise Affine Basis Encoding)—a decomposition method that represents neural network weights as an **addressable memory system**. For any group of similar layers, we extract three interpretable components: (1) a shared mean weight $\overline{W}$ (long-term memory), (2) a low-rank basis of variations (address space), and (3) per-layer coefficients $\alpha_i$ (pointers).
+We introduce **GABE** (Groupwise Affine Basis Encoding) — a decomposition method that represents neural network weights as an **addressable memory system**. For any group of similar layers, we extract three components: (1) a shared mean weight $\overline{W}$ (long-term memory), (2) a low-rank basis of variations $B_k$ (address space), and (3) per-layer coefficients $\alpha_i$ (pointers).
 
-We demonstrate that these coefficients $\alpha_i$ are **not static** but can be accurately predicted from the input via a small router network (Pearson $r = 0.927$). Comprehensive experiments on ResNet-18, Stable Diffusion, and synthetic tasks reveal:
+Experiments on ResNet-18, Stable Diffusion, and synthetic tasks reveal:
 
-- **Skill transfer** by copying only stable components between models.
-- **Dynamic input-dependent weights outperform static models** (98.2% vs 72.0% accuracy), demonstrating the power of adaptive processing.
-- **Coefficients form semantically meaningful clusters** in a learned representation space.
+- **The GABE basis subspace is not functionally neutral.** Across three independent functional matrices — Hessian ($H$), Fisher Information ($F$), and Gradient Covariance (GCM) — GABE directions carry 2–3× more energy than random directions of the same shape (all p < 0.001). The effect is consistent across matrices with different geometric meanings, making a coincidental explanation unlikely.
+- **Coefficients ($\alpha_i$) are 4× more sensitive to noise** than the mean weight $\overline{W}$ or basis $B_k$ in Stable Diffusion — consistent with the pointer analogy.
+- Per-layer coefficients are **predictable from input** via a small router network (Pearson $r = 0.927$ on a synthetic task).
+- A **dynamic GABE architecture** outperforms a static baseline on a synthetic classification task (98.2% vs 72.0%).
 
-GABE provides both a practical framework for transfer learning and continual learning, and a new theoretical lens: modern neural networks operate as **memory-addressed computers** that retrieve and combine knowledge, rather than as collections of independent weights. This perspective also outlines a clear strategy for significant model optimization.
+The cross-matrix geometric consistency is the strongest empirical result: the same 2–3× elevation appears whether geometry is measured by loss curvature, output sensitivity, or gradient diversity. GABE directions do not coincide with the *maximum*-energy directions of any matrix — the subspace is elevated but not dominant.
 
-**Keywords:** weight decomposition, memory-addressed networks, model optimization, skill transfer, weight-space editing, continual learning
+GABE provides a practical framework for transfer learning and continual learning, and a theoretical lens through which trained networks resemble **memory-addressed computers** — though this analogy is illustrative rather than formally proven.
 
----
-
-## 1. Introduction
-
-### 1.1 Motivation
-
-Modern deep neural networks contain billions of parameters, creating severe challenges:
-
-- **Extreme memory requirements**: GPT-3 (~350 GB), Stable Diffusion (~5 GB)
-- **Difficult transfer learning**: full model retraining is often inefficient.
-- **Catastrophic forgetting** in continual learning scenarios.
-- **Limited understanding** of how knowledge is internally organized.
-
-Traditional approaches treat each layer's weights as independent parameters, leading to redundancy and inefficiency. We challenge this assumption.
-
-### 1.2 Core Hypothesis
-
-We hypothesize that trained networks do **not** store weights of each layer independently, but instead use a **hierarchical addressable memory system**:
-
-$$
-W_i(x) = \overline{W} + \sum_{k=1}^K \alpha_i(x)[k] \cdot B_k
-$$
-
-where:
-- $\overline{W}$ — shared long-term knowledge (RAM)
-- $B_k$ — address space (basis directions)
-- $\alpha_i(x)$ — context-dependent pointers generated by a Router
-
-This formulation draws inspiration from computer architecture: weights are "read" from shared memory using learned addresses.
-
-### 1.3 Contributions
-
-1. **Mathematical formalization** of GABE decomposition with an addressable memory interpretation.
-2. **Empirical proof** of a component stability hierarchy through systematic perturbation experiments.
-3. **Discovery** that coefficients are a **predictable function of input** ($r = 0.927$).
-4. **A new architectural paradigm**: Memory-Addressed Networks (MANet) with dynamic, input-dependent weights.
-5. **Practical applications**: demonstrated efficient skill transfer, a solution for continual learning without forgetting, and a new pathway for model optimization.
+**Keywords:** weight decomposition, memory-addressed networks, model compression, skill transfer, weight-space editing, continual learning
 
 ---
 
-## 2. Theoretical Foundations
+## Core Idea
 
-### 2.1 GABE Decomposition
+Traditional approaches treat each layer's weights as independent parameters. GABE challenges this assumption with a single decomposition:
 
-For a group of $L$ similar layers $\{W_1, \dots, W_L\}$ (e.g., all Conv2d layers with the same shape):
+$$W_i(x) = \overline{W} + \sum_{k=1}^K \alpha_i(x)[k] \cdot B_k$$
 
-**Algorithm:**
+| Component | Role | Computer Science Analogy |
+|-----------|------|--------------------------|
+| $\overline{W}$ | Shared long-term knowledge | RAM contents |
+| $B_k$ | Directions of variation | Memory address offsets |
+| $\alpha_i$ | Per-layer / per-input coordinates | Pointers |
+| Router | Generates $\alpha_i(x)$ from input | Memory controller |
 
-1. **Compute mean weight**:
-   $$\overline{W} = \frac{1}{L}\sum_{i=1}^L W_i$$
+The analogy is motivated empirically: corrupting $\alpha_i$ (small in magnitude, high in functional sensitivity) behaves like broken pointers — causing immediate failure rather than graceful degradation. This is consistent with, but does not uniquely prove, the memory-addressing interpretation.
 
-2. **Center and stack**:
-   $$\Delta W_i = W_i - \overline{W}$$
+---
 
-3. **Apply SVD** to the stacked centered weights:
-   $$[\Delta W_1, \Delta W_2, \dots, \Delta W_L] = U \Sigma V^T$$
+## Decomposition Algorithm
 
-4. **Extract basis**: First $K = L-1$ right singular vectors form the basis $\{B_1, \dots, B_K\}$.
+For a group of $L$ layers with identical shape $\{W_1, \dots, W_L\}$:
 
-5. **Compute coefficients**:
-   $$\alpha_i = U_i \cdot \Sigma_i$$
+1. **Mean weight**: $\overline{W} = \frac{1}{L}\sum_{i=1}^L W_i$
+2. **Center**: $\Delta W_i = W_i - \overline{W}$
+3. **SVD** on stacked centered weights: $[\Delta W_1, \dots, \Delta W_L] = U \Sigma V^T$
+4. **Basis**: first $K = L-1$ right singular vectors $\{B_1, \dots, B_K\}$
+5. **Coefficients**: $\alpha_i = U_i \cdot \Sigma_i$
+6. **Reconstruction**: $W_i \approx \overline{W} + \sum_{k=1}^K \alpha_i[k] \cdot B_k$
 
-6. **Reconstruction**:
-   $$W_i \approx \overline{W} + \sum_{k=1}^K \alpha_i[k] \cdot B_k$$
-
-### 2.2 A Pathway to Optimization
-
-GABE naturally provides a strategy for model optimization. Instead of storing $L$ large, redundant weight matrices, one can store the shared components ($\overline{W}$ and $B_k$) only once. The per-layer information is then reduced to the small set of coefficients, $\alpha_i$.
-
-This separation enables two optimization pathways:
-1. **Static Compression**: Store the shared $\overline{W}$ and $B_k$ and the small set of coefficients for each of the $L$ layers. This already reduces redundancy by factoring out the common knowledge base.
-2. **Dynamic Generation**: Store only the shared $\overline{W}$ and $B_k$, and replace all per-layer coefficients with a single, compact Router network that generates them on-the-fly from the input. As we show in Experiment 5, this is not only possible but highly effective.
-
-This reframes optimization from a problem of compressing individual weights to one of efficiently representing a shared knowledge base and a lightweight addressing mechanism.
-
-### 2.3 Interpretation as Addressable Memory
-
-| Component | Role in GABE | Computer Science Analogy |
-|-----------|--------------|--------------------------|
-| $\overline{W}$ | Long-term shared knowledge | RAM (initialized memory) |
-| $B_k$ | Address space | Memory offsets / blocks |
-| $\alpha_i$ | Context-dependent pointers | Pointers + read strengths |
-| Router | Generates $\alpha_i(x)$ from input $x$ | Memory controller |
-
-**Read operation:**
 ```python
-def read_weights(coeffs):
-    """Read weights from shared memory using pointers"""
-    result = W_bar.clone()  # Base memory
-    for k in range(K):
-        address = Basis[k]      # Where to read
-        strength = coeffs[k]    # How strongly
-        result += strength * address
+def read_weights(W_bar, Basis, coeffs):
+    """Reconstruct layer weights from shared memory + addressing coefficients."""
+    result = W_bar.clone()
+    for k, strength in enumerate(coeffs):
+        result += strength * Basis[k]
     return result
 ```
 
-**Key insight from experiments (Section 4.4):**
-Damaged coefficients are analogous to broken pointers causing segmentation faults, leading to immediate catastrophic failure. This strongly supports the memory system analogy.
+**Why SVD?** SVD minimizes the Frobenius ($L_2$) reconstruction error:
 
-### 2.4 Related Work
+$$\min_{\overline{W},\, B_k} \sum_i \left\| W_i - \overline{W} - \sum_k \alpha_i[k] \cdot B_k \right\|_F^2$$
 
-**Weight-space methods:**
-- **Universal Weight Subspace Hypothesis** (Kaushik et al., arXiv:2512.05117, 2025) — demonstrates that fine-tuned weights lie in a shared low-dimensional subspace. GABE explains *why* this occurs (shared $\overline{W}$ + $B_k$) and adds dynamic addressing via Router.
-- **Hyper-Representations** (Schürholt et al., NeurIPS 2022) — generative models over weight space. GABE is more interpretable, far more compact, and provides explicit semantic decomposition.
-- **Model Merging** (Wortsman et al., 2022; Ilharco et al., 2022) — averaging or interpolating weights. GABE provides a principled framework for understanding *why* merging works (shared subspace structure).
+This means $B_k$ captures the directions of **maximum inter-layer variance** — the axes along which layers differ most. The experiments show these same directions are also the most functionally sensitive ones. That correspondence is non-trivial: $L_2$ reconstruction optimality does not imply functional criticality, yet the two appear to coincide. A basis aligned with top Hessian or Fisher eigenvectors might reveal an even stronger effect (see [Limitations](#limitations--open-questions)).
 
-**Dynamic architectures:**
-- **Neural Turing Machines** (Graves et al., 2014) & **Differentiable Neural Computers** (2016) — external memory with learned addressing. GABE is a lightweight, fully differentiable analogue with memory embedded in weight space.
-- **Mixture of Experts** (Shazeer et al., 2017) — routes inputs to different expert networks. GABE routes inputs to different *combinations* of shared basis vectors, achieving similar benefits with far fewer parameters.
-
-**Key distinction:** GABE is the first to demonstrate that *coefficients themselves* are a predictable function of input, enabling dynamic weight generation on the fly.
+> ⚠️ **Note on basis universality (open question):** The CKA = 1.0 result means the column spaces spanned by the basis vectors are identical across models, even when individual vectors are randomly rotated ($r \approx 0.0$ element-wise). However, a reviewer could correctly note that this may be a **mathematical artifact**: SVD applied to same-shaped matrices may produce the same subspace *by construction*, regardless of the weight values. If so, "universality" is not an empirical discovery but a property of the procedure itself. The claim becomes non-trivial only if basis directions correspond to functionally meaningful loss-landscape directions (high curvature). See **Experiment 7** for the proposed validation. The "hardware" framing is an analogy that awaits formal justification.
 
 ---
 
-## 3. Experimental Methodology
+## Experiments & Results
 
-We conducted six complementary experiments to validate our hypothesis from multiple angles.
+### 1 · Correlation Stability Across Models (ResNet-18: ImageNet vs. CIFAR-10)
 
-### Experiment 1: Correlation Analysis (GABEtest2)
+| Layer Shape | Pearson $\rho$ | Status |
+|-------------|:--------------:|--------|
+| [64, 576] | **0.998** | ✓ Stable |
+| [128, 1152] | -0.719 | ✗ Unstable |
+| [256, 2304] | -0.396 | ✗ Unstable |
+| [512, 4608] | **0.987** | ✓ Stable |
 
-**Objective:** Identify stable vs. unstable layers across different trained models.
-
-**Procedure:**
-1. Load two ResNet-18 models: one pre-trained on ImageNet, one on CIFAR-10
-2. Apply GABE decomposition to all Conv2d layer groups
-3. Extract coefficients for each group
-4. Compute Pearson correlation matrix between coefficients across models
-
-**Metrics:**
-- Pearson correlation $\rho$ between coefficients of corresponding layers
-- Threshold for "stability": $\rho \geq 0.9$
-
-**Hypothesis:** Early and late layers should show high correlation (universal features), while middle layers adapt to task specifics.
-
-### Experiment 2: Skill Transfer (GABEtest3)
-
-**Objective:** Verify that stable components can be transferred between models.
-
-**Procedure:**
-1. Identify stable layers from Experiment 1 (high correlation)
-2. Copy coefficients from source model to target model
-3. Reconstruct weights via GABE
-4. Verify tensor shapes and reconstruction quality
-
-**Success criterion:** All tensors correctly reconstructed with matching shapes.
-
-### Experiment 3: Coefficient Dependency Analysis (GABEtest4)
-
-**Objective:** Measure predictability of unstable coefficients from stable ones.
-
-**Procedure:**
-1. For each batch during inference: extract stable and unstable coefficients
-2. Train Linear Regression: $\text{coeffs}_{\text{unstable}} = f(\text{coeffs}_{\text{stable}})$
-3. Compute $R^2$ coefficient of determination
-
-**Metrics:**
-- $R^2$ score
-- Interpretation: $R^2 > 0.8$ indicates strong dependency
-
-**Implication:** If high $R^2$, we can store only stable coefficients and generate unstable ones on demand.
-
-### Experiment 4: Perturbation Study on Stable Diffusion (Critical Experiment)
-
-**Objective:** Understand the **role and fragility** of each GABE component in generative models.
-
-**Procedure:**
-1. Load Stable Diffusion v1.5
-2. For each perturbation mode $\{\overline{W}, B_k, \alpha_i, \text{all}\}$:
-   - Add Gaussian noise at varying scales: $\text{scale} \in [0, 0.15, 0.35, 0.6, 1.0, 1.5]$
-   - Generate image with fixed seed and prompt
-   - Save result
-3. Visually assess degradation
-
-**Metrics:**
-- Scale at first visible artifact
-- Scale at complete semantic breakdown
-- Preservation of prompt coherence
-
-**Prediction:** Coefficients should be most fragile (broken pointers → crash), basis intermediate, $\overline{W}$ most robust (data corruption → gradual degradation).
-
-### Experiment 5: Router Training (GABEtest6) — Core Validation
-
-**Objective:** Prove that coefficients are a **function of input**.
-
-This experiment comprises three sub-tests:
-
-#### Test 5.1: Synthetic Memory-Addressing Task
-
-**Setup:**
-- Create 10 "concepts" (random 64-dimensional vectors)
-- Each input $x$ has ground-truth coefficients $\alpha(x)$ that determine which concepts to combine
-- Target pattern: $y = \overline{W} + \sum \alpha(x)[k] \cdot \text{concept}_k$
-
-**Procedure:**
-1. Generate 200 training samples: $(x_i, \alpha_i^{\text{true}})$
-2. Train Router (MLP): $\alpha^{\text{pred}} = \text{Router}(x)$
-3. Measure reconstruction loss and coefficient correlation
-
-**Metrics:**
-- Reconstruction MSE
-- Coefficient MSE
-- **Pearson correlation** between true and predicted coefficients
-
-**Success criterion:** $r > 0.8$ would strongly support addressable memory hypothesis.
-
-#### Test 5.2: Static vs. Dynamic Architecture Comparison
-
-**Setup:**
-- Classification task (10 classes, 500 samples)
-- Compare two models:
-  1. **Fixed**: standard linear layers with static weights
-  2. **Dynamic (GABE-style)**: $W(x) = \overline{W} + \sum \text{Router}(x)[k] \cdot B_k$
-
-**Procedure:**
-1. Train both models for 200 epochs
-2. Measure final test accuracy
-3. Analyze generated coefficients: check variability across different inputs
-
-**Metrics:**
-- Classification accuracy
-- Standard deviation of coefficients across samples (measures input-dependency)
-
-**Hypothesis:** Dynamic model should achieve higher accuracy if input-dependent routing is beneficial.
-
-#### Test 5.3: Coefficient Space Visualization
-
-**Setup:**
-- Binary classification with 2D input (for easy visualization)
-- Model generates 3 coefficients per input
-
-**Procedure:**
-1. Train model to 100% accuracy
-2. Visualize:
-   - Input space (scatter of samples)
-   - Coefficient space in 2D and 3D
-3. Compute Silhouette score for class separation in coefficient space
-
-**Expected result:** Clean semantic clusters in coefficient space, demonstrating that coefficients encode task-relevant structure.
+Early and deep layers show high stability across tasks; middle layers diverge. This suggests a "core + adaptation" structure, consistent with prior work on universal feature representations.
 
 ---
 
-## 4. Results
+### 2 · Skill Transfer
 
-### 4.1 Correlation Analysis (Experiment 1)
+Stable-layer coefficients were copied from an ImageNet ResNet-18 to a CIFAR-10 model. All tensors reconstructed with correct shapes via GABE:
 
-**ResNet-18: ImageNet vs. CIFAR-10**
-
-| Layer Shape | Correlation | Status |
-|-------------|-------------|--------|
-| [64, 576]   | **0.998**   | ✓ Stable |
-| [128, 1152] | -0.719      | ✗ Unstable |
-| [256, 2304] | -0.396      | ✗ Unstable |
-| [512, 4608] | **0.987**   | ✓ Stable |
-
-**Interpretation:**
-- **Early layers** (64 filters): Extract universal low-level features (edges, textures) → highly stable across tasks
-- **Deep layers** (512 filters): High-level representations also stable → possibly universal compositional structures
-- **Middle layers**: Task-specific adaptation → negative correlation indicates specialized divergence
-
-This hierarchy suggests a "core + adaptation" structure in trained networks.
-
-### 4.2 Skill Transfer (Experiment 2)
-
-**Identified stable layers:** `[512, 4608]`, `[64, 576]`
-
-**Transfer procedure results:**
 ```
-Layer [64, 576]:   4 tensors reconstructed, shape [64, 576]    ✓
-Layer [128, 1152]: 3 tensors reconstructed, shape [128, 1152]  ✓
-Layer [256, 2304]: 3 tensors reconstructed, shape [256, 2304]  ✓
-Layer [512, 4608]: 3 tensors reconstructed, shape [512, 4608]  ✓
+Layer [64, 576]:   4 tensors ✓    Layer [128, 1152]: 3 tensors ✓
+Layer [256, 2304]: 3 tensors ✓    Layer [512, 4608]: 3 tensors ✓
 ```
 
-All tensors correctly restored via GABE. **Conclusion:** Skill transfer via coefficient copying is feasible.
+**Implication:** Copying $\overline{W}$ and $B_k$ while retraining only $\alpha_i$ is a viable transfer learning strategy — faster and lower-memory than full fine-tuning.
 
-**Practical implication:** For fine-tuning, copy stable $(\overline{W}, B_k)$ and retrain only coefficients — significantly faster than full fine-tuning.
+---
 
-### 4.3 Coefficient Dependency (Experiment 3)
+### 3 · Coefficient Predictability from Stable Components
 
-**$R^2$ for predicting unstable from stable coefficients:**
+A linear regressor was trained to predict unstable-layer coefficients from stable-layer coefficients:
 
 | Model | $R^2$ |
-|-------|-------|
-| Source (ImageNet) | **0.8713** |
-| Target (CIFAR-10) | **0.9490** |
+|-------|:-----:|
+| Source (ImageNet) | **0.871** |
+| Target (CIFAR-10) | **0.949** |
 
-**Conclusion:** Unstable coefficients are 87-95% predictable from stable ones!
+Unstable coefficients are 87–95% predictable from stable ones, suggesting structural dependency within the coefficient space.
 
-**Practical significance:**
-- Store only stable coefficients + small predictor network (~100 KB MLP)
-- Generate unstable coefficients on demand
+---
 
-### 4.4 Stable Diffusion Perturbation Study (Experiment 5) — **Most Striking Result**
+### 4 · Perturbation Study on Stable Diffusion v1.5 *(most striking result)*
 
-**Hierarchy of component fragility:**
+Gaussian noise was added to each GABE component independently at increasing scales:
 
-| Component | First Visible Effect | Total Breakdown | Behavior |
-|-----------|---------------------|-----------------|----------|
-| $\overline{W}$ (w_bar) | 1.00 | >1.5 | Gradual detail changes, **semantics preserved** |
-| $B_k$ (basis) | 0.60 | 1.0–1.5 | Small detail alterations, structure remains |
-| $\alpha_i$ (coeffs) | **0.15** | **0.35** | **Rapid corruption**, barely recognizable at 0.15 |
-| All (affine) | **0.0** | **0.0** | **Immediate catastrophic failure** → pure noise |
+| Component | First Visible Artifact | Total Breakdown | Behavior |
+|-----------|:----------------------:|:---------------:|----------|
+| $\overline{W}$ | 1.00 | >1.5 | Gradual detail changes; semantics preserved |
+| $B_k$ | 0.60 | 1.0–1.5 | Mild alterations; structure remains |
+| $\alpha_i$ | **0.15** | **0.35** | Rapid corruption; barely recognizable at 0.15 |
+| All (affine) | **0.0** | **0.0** | Immediate catastrophic failure → pure noise |
 
-**Figure 1** shows hierarchy of component fragility:
+The coefficient component is ~4× more sensitive to noise than $\overline{W}$, despite being orders of magnitude smaller. This **anisotropy in functional sensitivity** is the central empirical observation. The "broken pointer" framing is a useful analogy; a fuller account would require analysis of the loss landscape (e.g. Hessian eigenvectors along these directions).
 
 <div align="center">
 <img src="scale.jpg" alt="Stable Diffusion Perturbation Study" width="100%"/>
+
+**Figure 1:** Perturbation hierarchy. Each row shows image quality as Gaussian noise scale increases for one GABE component. Coefficient corruption (row 3) produces recognizable artifacts already at scale 0.15 and total breakdown at 0.35, while mean weight corruption (row 1) preserves semantics past scale 1.0.
 </div>
 
-**Interpretation:** The extreme fragility of coefficients (~4× more than the basis) provides the most intuitive and powerful evidence for the "broken pointer" analogy. Corrupting the model's core knowledge ($\overline{W}$) leads to graceful degradation, while corrupting its ability to *access* that knowledge ($\alpha_i$) leads to immediate system failure.
+---
 
-**Visual confirmation:** All generated images matched prompt semantics when intact, but coefficients corruption destroyed this relationship fastest.
+### 5 · Router Training — Coefficient Predictability from Input
 
-### 4.5 Router Training (Experiment 6) — **Core Validation of Hypothesis**
+Three sub-experiments validate whether $\alpha_i$ can be predicted from input $x$.
 
-#### Test 5.1: Synthetic Task
+#### 5.1 Synthetic Memory-Addressing Task
 
-**Training curves:**
+A small MLP Router was trained to predict ground-truth coefficients for a synthetic task (10 concepts, 200 training samples):
+
 ```
 Epoch 100: Recon Loss = 0.0601 | Coeff MSE = 0.0071
 Epoch 200: Recon Loss = 0.0338 | Coeff MSE = 0.0042
 Epoch 300: Recon Loss = 0.0215 | Coeff MSE = 0.0029
 Epoch 400: Recon Loss = 0.0143 | Coeff MSE = 0.0020
-Epoch 500: Recon Loss = 0.0097 | Coeff MSE = 0.0015 (converged)
+Epoch 500: Recon Loss = 0.0097 | Coeff MSE = 0.0015  ← converged
 ```
 
-**Final metrics:**
-- Reconstruction Loss: **0.0097**
-- Coefficient MSE: **0.0015**
-- **Pearson correlation: 0.9272**
-
-**Test set (generalization):** Loss = 0.1959
-
-**Example prediction:**
 ```
-True coefficients:      [0.136, 0.008, 0.073, 0.122, 0.232]
-Predicted coefficients: [0.126, 0.062, 0.031, 0.088, 0.202]
-Correlation: 0.93
+True:      [0.136, 0.008, 0.073, 0.122, 0.232]
+Predicted: [0.126, 0.062, 0.031, 0.088, 0.202]
+Pearson r: 0.93
+Test loss: 0.196
 ```
-
-**Figure 2** shows training dynamics:
 
 <div align="center">
 <img src="coeffs_addressing_test.png" alt="Router Training Curves" width="100%"/>
 
-**Figure 2:** Router training curves. Left: Reconstruction loss (how well patterns are restored). Right: Coefficient MSE (how accurately pointers are predicted). Both converge smoothly, demonstrating that coefficients are learnable functions of input.
+**Figure 2:** Router training curves. Left: Reconstruction loss. Right: Coefficient MSE. Both converge smoothly, demonstrating that coefficients are learnable functions of input on this synthetic task.
 </div>
 
-**Interpretation:** 
-- Correlation 0.93 proves coefficients are **deterministic functions of input**
-- If coefficients were random noise, correlation would be ~0
-- Router successfully learned the addressing mechanism
+**Interpretation:** The high correlation on a controlled synthetic task strongly suggests that coefficients can be a learnable function of input. The train/test gap (0.0097 vs 0.196) indicates generalization depends on task complexity and dataset size.
 
-#### Test 5.2: Architecture Comparison
+#### 5.2 Static vs. Dynamic Architecture (Synthetic Classification)
 
-**Fixed model (static weights):**
+**Static model (fixed weights):**
 ```
 Epoch  50: Loss = 2.047, Acc = 0.348
 Epoch 100: Loss = 1.744, Acc = 0.472
 Epoch 150: Loss = 1.424, Acc = 0.602
 Epoch 200: Loss = 1.105, Acc = 0.720
 ```
-**Final accuracy: 72.0%**
 
-**Dynamic GABE model (input-dependent weights):**
+**Dynamic GABE model (input-dependent $\alpha$):**
 ```
 Epoch  50: Loss = 2.043, Acc = 0.288
 Epoch 100: Loss = 1.273, Acc = 0.582
 Epoch 150: Loss = 0.678, Acc = 0.854
 Epoch 200: Loss = 0.276, Acc = 0.980
 ```
-**Final accuracy: 98.2%**
 
-**Analysis of generated coefficients (5 random samples):**
+| Model | Final Accuracy |
+|-------|:--------------:|
+| Static (fixed weights) | 72.0% |
+| Dynamic GABE (input-dependent $\alpha$) | **98.2%** |
+
+Coefficient variability across 5 random inputs confirms active routing:
 ```
 Input 0: [ 0.179, -0.021,  2.022, -0.655,  1.424]
 Input 1: [ 0.187,  1.023, -0.202,  0.245,  0.253]
 Input 2: [-0.564, -0.430,  0.512, -0.873,  0.370]
 Input 3: [-0.220,  0.626, -0.440, -0.225,  0.007]
 Input 4: [ 0.489,  0.384,  0.175, -0.574,  0.134]
-
-Standard deviation per coefficient: [0.474, 0.503, 0.472, 0.508, 0.413]
-Mean std: 0.474
+Std per dim: [0.474, 0.503, 0.472, 0.508, 0.413]  mean std = 0.474
 ```
 
-**Key observation:** Coefficients vary **significantly** across inputs (std ≈ 0.47).  
-→ Different inputs generate different "pointers"  
-→ Different pointers read different combinations from memory  
-→ Input-dependent addressing is active and essential
+The dynamic model achieves a 26-point improvement on this **synthetic 10-class task** (500 samples). This demonstrates the expressive advantage of input-conditioned weight routing under controlled conditions; results on standard benchmarks are an open question.
 
-**Conclusion:** Dynamic routing via input-dependent coefficients provides **26% absolute improvement** over static weights.
+#### 5.3 Coefficient Space Visualization
 
-#### Test 5.3: Visualization
-
-**Training:** Converged to 100% accuracy within 100 epochs.
-
-**Figure 3** shows the transformation from input space to coefficient space:
+Binary classification with 2D inputs: after training to 100% accuracy, the two classes form distinct linear manifolds ("rays") in 3D coefficient space. Semantic structure emerges in coefficient space without explicit supervision, consistent with the idea that $\alpha_i$ encodes task-relevant addressing patterns.
 
 <div align="center">
 <img src="coeffs_space_visualization.png" alt="Coefficient Space Visualization" width="100%"/>
 
-**Figure 3:** Visualization of input space (left) vs. coefficient space (center: 2D, right: 3D). Classes are perfectly separated in coefficient space, demonstrating that coefficients encode semantic task structure. The two classes form distinct linear trajectories in coefficient space, suggesting that Router has learned to map input semantics to distinct "addressing patterns" in memory.
+**Figure 3:** Input space (left) vs. coefficient space (center: 2D, right: 3D). Classes are perfectly separated in coefficient space. Class 0 occupies a diagonal from (−7, −15) to (0, −2); Class 1 from (5, 5) to (12, 12). In 3D each class forms a distinct 1D manifold ("ray"), suggesting the Router maps class semantics to distinct addressing patterns.
 </div>
 
-**Observations:**
-- **Input space**: Two Gaussian clusters (blue = Class 0, red = Class 1), linearly separable
-- **Coefficient space (2D)**: Perfect linear separation with large margin
-  - Class 0: diagonal from (-7, -15) to (0, -2)
-  - Class 1: diagonal from (5, 5) to (12, 12)
-- **Coefficient space (3D)**: Two parallel "rays" — each class occupies a distinct 1D manifold
+---
 
-**Silhouette score (expected):** >0.9 (near-perfect clustering)
+### 6 · Inter-Model Basis Universality
 
-**Interpretation:** 
-- Coefficients form **semantically meaningful representations**
-- Different tasks/classes map to different regions in coefficient space
-- This clustering emerges naturally from training, not imposed by design
-- Supports the view that coefficients are learned "addresses" for task-specific memory access
+CKA analysis across architectures (ResNet-18, GPT-2, DistilBERT) and training states:
+
+| Scenario | Component | CKA | Pearson $r$ |
+|----------|-----------|:---:|:-----------:|
+| Pre-trained vs. Random (ResNet-18) | $\overline{W}$ | 0.397 | ~0.0 |
+| | **Basis** $B_k$ | **1.000** | ~0.0 |
+| GPT-2 vs. DistilBERT | $\overline{W}$ | 0.036 | ~0.0 |
+| | **Basis** $B_k$ | **1.000** | ~0.0 |
+| Cross-group (within model) | $\overline{W}$ | 0.07–0.67 | ~0.0 |
+| | **Basis** $B_k$ | **1.000** | ~0.0 |
+
+CKA = 1.0 with near-zero element-wise correlation means the basis vectors span the same subspace across models, while individually rotated within it.
+
+> ⚠️ **Critical caveat — is this trivial?** CKA = 1.0 *may* be expected whenever SVD is applied to same-shaped matrices, independent of their values. If so, the result reflects the procedure, not the data, and "architecture-determined address space" is not an empirical finding but a mathematical inevitability. Two conditions are required to make the claim non-trivial: (A) show that basis directions carry disproportionate curvature energy compared to random directions of the same shape, and (B) show that matrices of *different* shapes produce *different* subspaces. Experiment 7 tests condition (A). Until then, this result is best stated as: *SVD on same-architecture layers yields geometrically consistent decompositions* — structurally useful, functionally unvalidated.
 
 ---
 
-### 4.6 Experiment 7: The Address Space is Universal and Architecture-Dependent
-(GABEtest_intermodel.py)
+### 7 · Hessian Alignment Test *(proposed — validates Experiment 6)*
 
-The inter-model comparison yielded a striking and unequivocal result: **the basis subspace is universal.** Across all tested architectures, training states, and layer groups, the basis vectors consistently inhabit the same low-dimensional subspace.
+**Purpose:** Determine whether GABE basis directions coincide with high-curvature directions of the loss landscape. This is the test that makes the CKA = 1.0 result non-trivial.
 
-**Key Findings from CKA Analysis:**
+**Formal statement:** Let $B \in \mathbb{R}^{D \times K}$ be the GABE basis (orthonormal), and $H \in \mathbb{R}^{D \times D}$ the Hessian of $\mathcal{L}$ w.r.t. the layer weights. Test whether:
 
-| Comparison Scenario                                | Component | CKA Similarity | Pearson $r$ | Interpretation                                         |
-| -------------------------------------------------- | --------- | :------------: | :---------: | ------------------------------------------------------ |
-| **ResNet-18 Pre-trained vs. Random** (Cross-Model) | $\overline{W}$ |     0.397      |    ~0.00    | Data/memory is distinct (training matters).            |
-|                                                    | **Basis** |   **1.000**    |  **~0.00**  | **Address space is identical, regardless of training.** |
-| **GPT-2 vs. DistilBERT** (Cross-Architecture)      | $\overline{W}$ |     0.036      |    ~0.00    | Data is completely different across architectures.     |
-|                                                    | **Basis** |   **1.000**    |  **~0.00**  | **Address space is universal, even across models.**    |
-| **Within any single model** (Cross-Group)          | $\overline{W}$ |   0.07 - 0.67  |    ~0.00    | Data for different layer groups is distinct.           |
-|                                                    | **Basis** |   **1.000**    |  **~0.00**  | **Address space is universal across all groups.**      |
+$$\text{span}(B) \approx \text{span}(V_{\text{top}})$$
 
-**Interpretation:**
-This result provides profound evidence for the memory-addressing analogy, with a new crucial distinction:
+where $V_{\text{top}}$ are the top-$K$ eigenvectors of $H$.
 
-1.  **The Basis ($B_k$) is "Hardware":** The CKA score of 1.0 indicates that the address space is not learned from data. **Crucially, while the CKA similarity is exactly 1.000, the element-wise Pearson correlation between the bases is near zero ($r \approx 0.0$). Geometrically, this means that although the individual basis vectors are rotated randomly in each model, they perfectly span the exact same universal subspace.** It is a fixed, geometric property determined by the network architecture itself — a universal set of possible variations, pre-existing even in a randomly initialized model. All groups, in all tested models, share this exact same "memory layout."
-2.  **$\overline{W}$ and $\alpha_i$ are "Software":** The shared mean $\overline{W}$ (the "data" stored in memory) and the coefficients $\alpha_i$ (the "pointers") are what is actually learned during training. This is confirmed by the low CKA similarity of $\overline{W}$ between trained and random models.
+**Three metrics (all required):**
 
-Furthermore, this universal basis is **energetically small**. By construction of SVD, the basis vectors capture the directions of *variation* around the mean, which account for a small fraction of the total variance (energy) of the weights. The bulk of the energy resides in the mean weight $\overline{W}$. This confirms the central finding: the address space is **geometrically universal but energetically minor.**
+**(A) Subspace Overlap** via principal angles:
+$$\text{Alignment} = \frac{1}{K} \sum_{i=1}^K \sigma_i^2, \quad \text{where } \sigma_i = \text{svd}(B^T V_{\text{top}})$$
+Range: 0 (orthogonal) → 1.0 (identical subspaces)
 
----
+**(B) Rayleigh Quotient** — do GABE directions carry high curvature?
+$$\lambda_{\text{GABE},i} = B_i^T H B_i$$
+Compare against the distribution from random orthonormal directions. If $\lambda_{\text{GABE}} \gg \lambda_{\text{random}}$, the hypothesis strengthens.
 
-## 5. Interpretation & Discussion
+**(C) Curvature Energy Ratio** — fraction of total curvature in GABE subspace:
+$$R = \frac{\text{Tr}(B^T H B)}{\text{Tr}(H)}$$
+If $R \gg K/D$ (the random baseline), GABE concentrates curvature disproportionately.
 
-### 5.1 Core Findings
+**Implementation** — see `GABEtest_hessian.py` (full script in repository).
 
-1. **Fragility hierarchy confirms pointer analogy**
-   - Coefficients are 4× more fragile than $\overline{W}$ and basis
-   - Perturbation behavior matches corrupted pointers: immediate catastrophic failure
-   - This is exactly what we'd expect if coefficients act as memory addresses
+The script implements all three metrics using Hessian-vector products (Pearlmutter trick) so the full Hessian is never materialised:
 
-2. **Coefficients are predictable from input** ($r = 0.927$)
-   - If coefficients were arbitrary parameters, correlation would be ~0
-   - High correlation proves: $\alpha_i = f(x_i)$ for some learnable $f$
-   - Router can be trained to generate coefficients on the fly
+```python
+def hessian_vector_product(loss, params, v):
+    """Pearlmutter trick: computes H @ v without materializing H."""
+    grad1 = grad(loss, params, create_graph=True)
+    flat_grad1 = torch.cat([g.reshape(-1) for g in grad1])
+    grad2 = grad(flat_grad1 @ v, params, retain_graph=True)
+    return torch.cat([g.reshape(-1) for g in grad2])
 
-3. **Dynamic weights outperform static ones** (98.2% vs. 72.0%)
-   - Input-dependent addressing provides 26% absolute accuracy gain
-   - Suggests that conventional static weights are suboptimal
-   - Dynamic routing allows model to adapt its "reading strategy" per input
+def curvature_energy_ratio(B, hvp_fn, trace_H):
+    """R = Tr(B^T H B) / Tr(H). Random baseline: K/D."""
+    trace_BHB = sum((B[:, i] @ hvp_fn(B[:, i])).item() for i in range(B.shape[1]))
+    return trace_BHB / (trace_H + 1e-12)
+```
 
-4. **Semantic structure in coefficient space**
-   - Different classes/tasks map to distinct regions (Figure 3)
-   - Clean linear separation emerges without explicit supervision
-   - Coefficients encode task-relevant information beyond mere classification logits
+Run:
+```bash
+# (64,64,3,3) has 4 layers in ResNet-18 — minimum 2 required for GABE
+python GABEtest_hessian.py --shape 64 64 3 3 --K 3 --n_bootstrap 100 --device cpu
+```
 
-### 5.2 Theoretical Implications
+**Expected outcomes:**
 
-#### Reframing Neural Network Training
+| Scenario | Alignment | Interpretation |
+|----------|:---------:|----------------|
+| A: Alignment ≈ 1.0 | Strong | SVD directions ≈ curvature directions — CKA=1.0 is non-trivial |
+| B: Alignment ≈ random | Weak | GABE ≠ curvature; consider Fisher/NTK basis |
+| C: Partial (0.3–0.6) | Moderate | GABE approximates curvature geometry; SVD is a useful proxy |
 
-**Traditional view:**  
-"Training = optimizing independent weights $W_i$ for each layer"
+**The critical statement this test enables:** If $R \gg K/D$ with $p < 0.01$:
 
-**GABE view:**  
-"Training = building universal memory $\overline{W}$ + basis $B_k$ + optimizing addressing $\alpha_i$"
-
-This shift has profound consequences:
-
-1. **Why fine-tuning works**: Shared subspace ($\overline{W}$, $B_k$) already encodes core knowledge; only addresses need adjustment
-2. **Why model merging works**: Models trained on similar data share $\overline{W}$ and $B_k$, differing mainly in coefficients
-3. **Why lottery tickets exist**: Correct initialization = good $\overline{W}$; winning subnetwork = correct coefficient pattern
-
-#### Connection to Biological Neural Networks
-
-| Component | GABE | Neuroscience Analogy |
-|-----------|------|----------------------|
-| $\overline{W}$ | Long-term memory | Hippocampus (consolidation) |
-| $B_k$ | Basis patterns | Cortical columns (feature detectors) |
-| $\alpha_i(x)$ | Context-dependent pointers | Prefrontal cortex (attention control) |
-| Router | Addressing generator | Thalamus (gating/routing) |
-
-**Hypothesis:** Biological neural networks may also use context-dependent addressing over shared representations rather than fully independent synaptic weights per "task."
-
-**Testable prediction:** If true, we should observe:
-- Stable neural populations across tasks (analogous to stable layers)
-- Task-specific modulation of activity patterns (analogous to coefficients)
-- Functional connectivity changes with context (analogous to dynamic routing)
-
-### 5.3 Relationship to Existing Theories
-
-#### Mixture of Experts (MoE)
-
-**Standard MoE:**
-$$\text{output} = \sum_i \text{gate}_i(x) \cdot \text{expert}_i(x)$$
-
-**GABE:**
-$$W_i(x) = \overline{W} + \sum_k \alpha_i(x)[k] \cdot B_k$$
-
-**Similarity:** Both use input-dependent routing.  
-**Difference:** MoE routes to discrete experts; GABE routes to continuous basis combinations.  
-**Advantage:** GABE is parameter-efficient (shared $\overline{W}$, $B_k$) and fully differentiable.
-
-#### Attention Mechanism
-
-**Attention:**
-$$\text{output} = \sum_i \text{attention}(Q, K_i) \cdot V_i$$
-
-**GABE:**
-$$W_i = \overline{W} + \sum_k \alpha_i[k] \cdot B_k$$
-
-**Parallel:** Coefficients act like attention weights over basis vectors.  
-**Extension:** Dynamic GABE ($\alpha_i(x)$) = self-attention in weight space.
-
-#### Neural Turing Machines (NTM)
-
-**NTM read operation:**
-$$r_t = \sum_i w_t[i] \cdot M[i]$$
-
-**GABE:**
-$$W_i = \overline{W} + \sum_k \alpha_i[k] \cdot B_k$$
-
-**Relationship:** GABE is a static (non-temporal) memory-addressing system.  
-**Difference:** NTM has external memory and learned controller; GABE embeds memory in weight space.  
-**Hybrid opportunity:** Combine GABE memory structure with NTM-style controllers for temporal reasoning.
-
-### 5.4 Limitations and Open Questions
-
-1. **Scalability to LLMs**  
-   - Current experiments on CNN-based models (ResNet, Stable Diffusion)
-   - Does GABE apply to Transformer attention/FFN layers in LLMs?
-   - Challenge: Very large layer counts; grouping strategy unclear
-
-2. **Optimal Router architecture**  
-   - Tested: Simple MLP routers
-   - Alternatives: Transformer-based, attention-based, hypernetworks
-   - Question: What architecture maximizes $R^2$ while minimizing parameters?
-
-3. **Basis selection and evolution**  
-   - Currently: SVD-derived basis (static after decomposition)
-   - Alternative: Learnable basis (jointly optimize with Router)?
-   - Question: Can basis be grown/pruned dynamically during training?
-
-4. **Biological validation**  
-   - Hypothesis: Real brains use addressing mechanisms
-   - Testable via fMRI: Do stable neural populations exist across tasks?
-   - Collaboration needed with neuroscience community
-
-5. **Lottery Ticket connection**  
-   - Hypothesis: Winning tickets = correct coefficient patterns
-   - Testable: Analyze GABE decomposition of winning vs. losing tickets
-   - Potential: Use GABE to search for lottery tickets more efficiently
+> *Directions of maximum inter-layer variance concentrate a disproportionate fraction of loss curvature — providing a rigorous geometric justification for the functional sensitivity hierarchy observed in Experiment 4.*
 
 ---
 
-## 6. Practical Applications
+#### Results (ResNet-18, layer group `(64, 64, 3, 3)`, K=3)
 
-### 6.1 Model Optimization and Compression
-GABE presents a powerful strategy for model optimization. Instead of storing a large number of redundant layers, a GABE-based model stores the shared knowledge base ($\overline{W}$ and $B_k$) only once. The per-layer specificity is then handled either by storing the compact coefficients or, even more efficiently, by a small Router network that generates them on-demand. This approach replaces parameter redundancy with a compact, reusable knowledge base and an efficient generation mechanism, offering a clear path toward significant reductions in model size.
+```
+Setup:
+  D_group = 36864   K = 3   Tr(H) = 2762.47
+  Top-3 Hessian eigenvalues (sanity check): [352.8, 247.3, 213.3]
 
-### 6.2 Efficient Transfer Learning
+(A) Subspace Overlap  [0=orthogonal, 1=identical subspaces]
+    GABE basis : 0.0004
+    Random     : 0.0000  (single sample)
 
-**Standard approach:**
-1. Copy all weights
-2. Fine-tune entire model (slow, high memory)
+(B) Rayleigh Quotients per direction  [curvature along each vector]
+    GABE   : [0.227, 0.360, 0.053]   mean = 0.213
+    Random : [0.057, 0.057, 0.073]   mean = 0.062
+    Ratio  : 3.42×
 
-**GABE approach:**
-1. Copy $\overline{W}$ and $B_k$ (stable knowledge)
-2. Retrain only coefficients or Router (fast, low memory)
+(C) Curvature Energy Ratio  R = Tr(B^T H B) / Tr(H)
+    GABE             : 0.000232
+    Bootstrap null   : 0.000078 ± 0.000015   (K/D baseline = 0.000081)
+    p-value          : 0.0000  (H₀: GABE = random)
+```
 
-**Advantages:**
-- **Speed**: Fewer parameters to optimize
-- **Memory**: No need to store optimizer states for full model
-- **Quality**: Preserves core knowledge, adapts only task-specific addressing
+**What the three metrics actually measure — and what they show:**
 
-**Experimental validation (Section 4.2):**  
-Stable layers successfully transferred between ImageNet and CIFAR-10 ResNets.
+| Metric | Question asked | Result |
+|--------|---------------|--------|
+| A — Subspace overlap | Is GABE the *optimal* curvature basis? | **No** — overlap ≈ 0 with top-3 Hessian eigenvectors |
+| B — Rayleigh quotient | Do GABE directions have *elevated* curvature vs random? | **Yes** — 3.42× more curvature per direction |
+| C — Energy ratio | Does the GABE subspace *concentrate* curvature beyond chance? | **Yes** — 3× random baseline, p < 0.001 |
 
-### 6.3 Multi-Task Learning
+The three metrics are not in contradiction — they answer different questions. Together they produce a precise, three-part picture:
 
-**Problem:** $N$ tasks traditionally require $N$ full models → $N \times \text{size}$ memory.
+**1. GABE directions are not the maximum-curvature directions** (Metric A = 0.0004). The top Hessian eigenvectors have Rayleigh quotients of 213–353; GABE directions have 0.05–0.36. The basis is not aligned with the extreme end of the loss landscape spectrum.
 
-**GABE solution:**
-- Store: $1 \times (\overline{W} + B_k)$ (shared)
-- Store: $N \times \alpha_i$ (task-specific coefficients)
+**2. GABE directions carry significantly more curvature than random directions** (Metrics B, C; p < 0.001). This rules out the trivial interpretation that CKA = 1.0 is purely a mathematical artifact of applying SVD to same-shaped matrices. If it were, GABE directions would carry no more curvature than random ones.
 
-**Memory scaling:**
-$$\text{Traditional: } N \times \text{ModelSize}$$
-$$\text{GABE: } \text{ModelSize} + N \times \text{CoeffSize}$$
+**3. The structure is real but moderate.** GABE captures 0.023% of total Hessian trace — 3× the random expectation of 0.008%, but a small absolute fraction. The basis sits in a *moderately elevated* curvature region, not the dominant one.
+
+**Revised claim for CKA = 1.0 (replaces the ⚠️ caveat in Experiment 6):**
+
+> The shared basis subspace is not a trivial SVD artifact: GABE directions concentrate 3× more loss curvature than random directions of the same shape (p < 0.001). However, they do not coincide with the maximum-curvature directions of the Hessian. Basis universality reflects a *real but moderate* geometric property — inter-layer variance correlates with elevated curvature, without capturing its extremes.
+
+**Implication for the fragility hierarchy (Experiment 4):**
+
+The 4× coefficient fragility has partial geometric grounding: GABE directions sit in a higher-curvature region than noise, explaining why perturbations along them cause more damage than uniform noise. A basis aligned with the top Hessian eigenvectors would likely produce sharper fragility contrasts. GABE is a practically computable approximation to the optimal sensitivity-based decomposition.
+
+---
+
+### 8 · Fisher / NTK / Gradient Covariance Alignment *(Experiments 9–11)*
+
+Three follow-up alignment tests probe different notions of functional geometry.
+All use identical metrics (A/B/C) and the same bootstrap procedure as Experiment 8.
+
+| Experiment | Matrix | Geometric meaning |
+|------------|--------|-------------------|
+| **9 — Fisher IM** | $F = \frac{1}{N}\sum_i g_i g_i^T$ | Directions of maximum output change per unit weight perturbation, weighted by data |
+| **10 — Empirical NTK** | $K_{\text{feat}} = \frac{1}{N}\sum_i J_i^T J_i$ | Directions learned fastest in the linearised training regime |
+| **11 — Gradient Covariance** | $\text{GCM} = \frac{1}{N}\sum_i (g_i - \bar{g})(g_i - \bar{g})^T$ | Variance of gradients across samples; isolates diversity from mean update direction |
+
+The Fisher / GCM split is diagnostically useful:
+$F = \text{GCM} + \bar{g}\bar{g}^T$.
+If GABE aligns with $F$ but not GCM, the signal comes from the *mean* gradient direction.
+If GABE aligns with GCM but not $F$, it captures *gradient diversity* across samples.
+
+**Run:**
+```bash
+python GABEtest_fisher.py  --shape 64 64 3 3 --K 3 --n_samples 256
+python GABEtest_gradcov.py --shape 64 64 3 3 --K 3 --n_samples 256
+# NTK: requires GPU — see note below
+python GABEtest_ntk.py     --shape 64 64 3 3 --K 3 --n_samples 128 --device cuda
+```
+
+---
+
+#### Exp 9 — Fisher IM Results (ResNet-18, `(64, 64, 3, 3)`, K=3, N=256)
+
+```
+Tr(F) = 6112.54   Top-3 Fisher eigenvalues: [769.4, 601.2, 520.6]
+
+(A) Subspace Overlap    GABE = 0.000301   Random = 0.000110
+(B) Rayleigh Quotients  GABE = [0.492, 0.761, 0.137]  mean = 0.464
+                        Random = [0.227, 0.185, 0.280] mean = 0.231
+                        Ratio = 2.01×
+(C) Energy Ratio        R_GABE = 0.000227   Bootstrap null = 0.000084 ± 0.000016
+                        p-value = 0.0000
+```
+
+**Scenario C — Elevated but misaligned.** GABE carries 2.0× more Fisher energy than random (p < 0.001), but does not span the top Fisher eigenvectors (overlap ≈ 0). This mirrors the Hessian result (3.4×) but at a lower ratio, suggesting the GABE basis is closer to generic weight structure than to the dominant directions of distributional sensitivity.
+
+---
+
+#### Exp 10 — Empirical NTK *(skipped on CPU)*
+
+The feature-space NTK requires $O(N 	imes C 	imes 	ext{n\_iter} 	imes 	ext{n\_bootstrap})$ forward passes. At $N=128$, $C=1000$, this is intractable on CPU (estimated >12 hours). The experiment is skipped pending GPU access.
+
+**To run on GPU:**
+```bash
+python GABEtest_ntk.py --shape 64 64 3 3 --K 3 --n_samples 128 --device cuda
+```
+
+A faster alternative that avoids the full per-sample Jacobian loop: replace the finite-difference JVP with `torch.func.jvp` (PyTorch ≥ 2.0), which computes $J_i v$ in a single vectorised forward pass without materialising $J_i$.
+
+---
+
+#### Exp 11 — Gradient Covariance Results (ResNet-18, `(64, 64, 3, 3)`, K=3, N=256)
+
+```
+||g_bar|| = 20.224   Tr(F) = 6112.54   Tr(GCM) = 5703.53
+Mean gradient direction: 6.7% of Fisher trace
+Top-3 GCM eigenvalues: [665.0, 522.4, 493.2]
+
+(A) Subspace Overlap    GABE = 0.000363   Random = 0.000132
+(B) Rayleigh Quotients  GABE = [0.406, 0.741, 0.130]  mean = 0.426
+                        Random = [0.194, 0.170, 0.278] mean = 0.214
+                        Ratio = 1.99x
+(C) Energy Ratio        R_GABE = 0.000224   Bootstrap null = 0.000084 +/- 0.000015
+                        p-value = 0.0000
+```
+
+**Fisher vs GCM decomposition:** The mean gradient direction accounts for only **6.7%** of Fisher trace (`Tr(F) = Tr(GCM) + ||g_bar||^2 = 5703.5 + 409.0`). The Fisher and GCM ratios are nearly identical (2.01× vs 1.99×), confirming that GABE alignment comes from **gradient variance across samples**, not the mean update direction.
+
+---
+
+#### Cross-experiment summary (Experiments 8–11)
+
+| Exp | Matrix | Top eigenvalues | Rayleigh ratio | Subspace overlap | p-value |
+|-----|--------|:---------------:|:--------------:|:----------------:|:-------:|
+| 8 — Hessian | $H$ | 352, 247, 213 | **3.42×** | 0.0004 | < 0.001 |
+| 9 — Fisher IM | $F$ | 769, 601, 521 | **2.01×** | 0.0003 | < 0.001 |
+| 10 — eNTK | $K_{\text{feat}}$ | — | — | — | *(GPU required)* |
+| 11 — Grad Covariance | GCM | 665, 522, 493 | **1.99×** | 0.0004 | < 0.001 |
+
+Random energy baseline (K/D) = 0.000081 in all experiments.
+
+**Central finding: the 2–3× energy elevation is consistent across all matrices.**
+
+The three matrices have different theoretical meanings and different scales (Tr(H) ≈ 2762, Tr(F) ≈ 6113, Tr(GCM) ≈ 5704), yet the relative elevation of GABE over random is stable:
+
+| What the matrix measures | Ratio | Interpretation |
+|--------------------------|------:|----------------|
+| Loss curvature (H) | **3.42×** | GABE correlates with sensitivity to parameter perturbations |
+| Output sensitivity (F) | **2.01×** | GABE correlates with distributional prediction change |
+| Gradient diversity (GCM) | **1.99×** | GABE correlates with sample-to-sample gradient variance |
+
+This pattern is difficult to explain as coincidence. The three matrices capture geometrically distinct properties; their consistent agreement points to a real structural property of the GABE subspace rather than sensitivity to any one notion of functional importance.
+
+**What this does and does not establish:**
+
+- ✓ The GABE basis subspace is *not* functionally neutral
+- ✓ The elevation is statistically robust (p < 0.001) and matrix-agnostic
+- ✓ The signal originates from gradient *variance* across samples, not from the mean gradient direction (Fisher/GCM parity; mean accounts for only 6.7% of Fisher trace)
+- ✗ GABE does not coincide with the *maximum*-energy directions of any matrix (overlap ≈ 0)
+- ✗ The full geometric account of the fragility hierarchy (Exp. 4) remains open
+
+**Precise formulation:**
+
+> The inter-layer covariance subspace identified by GABE is not functionally neutral: it occupies a statistically elevated region in loss curvature, output sensitivity, and gradient diversity simultaneously (2–3×, p < 0.001 in all cases). Whether CKA = 1.0 is procedural or data-driven remains partially open; these results provide indirect but convergent evidence that it is non-trivial.
+
+---
+
+### Model Compression
+
+Store $\overline{W}$ and $B_k$ once; per-layer information reduces to compact coefficients $\alpha_i$. A Router network can generate these on demand, replacing redundant parameter copies with a shared knowledge base and a lightweight addressing mechanism.
 
 **Example (ResNet-18, 10 tasks):**
 - Traditional: $10 \times 44$ MB = 440 MB
-- GABE: $44 + 10 \times 0.5$ MB = 49 MB
-- **Savings: 9×**
-  
-**Switching tasks:** $\text{model.load coeffs(task id)}$ — instant, no retraining.
+- GABE: $44 + 10 \times 0.5$ MB ≈ 49 MB → ~9× reduction
 
-### 6.4 Continual Learning without Forgetting
+### Transfer Learning
 
-**Catastrophic forgetting:** Training on Task B destroys performance on Task A.
+Copy stable $(\overline{W}, B_k)$; retrain only $\alpha_i$ or the Router. Fewer parameters to optimize, no full optimizer state required for the base model.
 
-**GABE solution:**
-1. **Freeze** $\overline{W}$ and $B_k$ (shared knowledge base)
-2. For each new task: train new coefficient set $\alpha_{\text{new}}$
-3. At inference: select appropriate $\alpha_{\text{task}}$
+### Continual Learning
 
-**Zero forgetting:** Old tasks unaffected because their coefficients are never overwritten.
+Freeze $\overline{W}$ and $B_k$; train a new $\alpha_{\text{task}}$ per task. Old coefficients are never overwritten, eliminating catastrophic forgetting by design. Memory cost: ~0.5 MB per additional task (ResNet-18). *Note: this strategy has been demonstrated in principle but not benchmarked on standard continual learning suites.*
 
-**Memory cost:** $\sim 0.5$ MB per task (for ResNet-18).
-
-### 6.5 New Architecture: Memory-Addressed Networks (MANet)
-
-**Proposed architecture:**
+### Dynamic Architecture: MANetLayer
 
 ```python
 class MANetLayer(nn.Module):
-    """Memory-Addressed Network Layer with Dynamic Routing"""
-    
     def __init__(self, input_dim, output_dim, num_basis=5):
         super().__init__()
-        
-        # Shared components (static)
-        self.memory = nn.Parameter(torch.randn(output_dim, input_dim))  # W_bar
-        self.basis = nn.Parameter(torch.randn(num_basis, output_dim, input_dim))  # B_k
-        
-        # Router (dynamic)
+        self.memory = nn.Parameter(torch.randn(output_dim, input_dim))   # W_bar
+        self.basis  = nn.Parameter(torch.randn(num_basis, output_dim, input_dim))  # B_k
         self.router = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_basis)
+            nn.Linear(input_dim, 64), nn.ReLU(), nn.Linear(64, num_basis)
         )
-    
+
     def forward(self, x):
-        # Generate coefficients from input
-        coeffs = self.router(x)  # (batch, num_basis)
-        
-        # Read weights from memory using pointers
+        coeffs = self.router(x)                                           # (batch, K)
         weighted_basis = torch.einsum('bk,koi->boi', coeffs, self.basis)
-        weights = self.memory.unsqueeze(0) + weighted_basis  # (batch, out, in)
-        
-        # Apply dynamic weights
-        output = torch.einsum('boi,bi->bo', weights, x)
-        return output
+        weights = self.memory.unsqueeze(0) + weighted_basis               # (batch, out, in)
+        return torch.einsum('boi,bi->bo', weights, x)
 ```
 
-**Advantages:**
-- **Parameter efficiency**: $O(d^2)$ memory, $O(Kd^2)$ basis, $O(d)$ Router vs. $O(Ld^2)$ traditional
-- **Adaptivity**: Weights adjust automatically to input
-- **Interpretability**: Coefficients show "what the layer is reading"
+### Weight-Space Editing
 
-**Empirical validation (Test 5.2):** MANet achieved **98.2%** accuracy vs. **72.0%** for static baseline.
+Interpolate between coefficient sets to blend styles or concepts:
 
-### 6.6 Weight-Space Editing
+$$\alpha_{\text{new}} = t \cdot \alpha_A + (1-t) \cdot \alpha_B$$
 
-**Concept:** Manipulate generated images by editing coefficient space.
-
-**Example workflow:**
-1. Generate image: "a castle" → extract $\alpha_{\text{castle}}$
-2. Generate image: "cyberpunk city" → extract $\alpha_{\text{cyberpunk}}$
-3. Compute interpolation: $\alpha_{\text{new}} = t \cdot \alpha_{\text{castle}} + (1-t) \cdot \alpha_{\text{cyberpunk}}$
-4. Apply $\alpha_{\text{new}}$ to UNet → get "cyberpunk castle"
-
-**More advanced:** Train small classifier $\text{style} = g(\alpha)$ and optimize $\alpha$ to achieve desired style while preserving content.
-
-**Advantage over prompt engineering:** Direct control in weight space rather than indirect via text.
+This enables direct manipulation in weight space rather than indirect control via prompts.
 
 ---
 
-## 7. Conclusion & Future Work
+## Limitations & Open Questions
 
-### 7.1 Summary
+1. **Scalability to LLMs** — Experiments are CNN-based (ResNet-18, Stable Diffusion). Applying GABE to Transformer attention/FFN layers at scale is unvalidated.
 
-We have demonstrated that modern neural networks are not collections of independent weights, but **memory-addressed systems**. GABE decomposes weights into:
+2. **Benchmark evaluation** — The 98.2% vs. 72.0% comparison is a synthetic task. Standard benchmark results (ImageNet, GLUE, etc.) are needed before strong performance claims.
 
-1. **Long-term memory** ($\overline{W}$) — shared semantic knowledge
-2. **Address space** ($B_k$) — directions of variation
-3. **Pointers** ($\alpha_i$) — context-dependent memory access
+3. **CKA = 1.0 — partially validated, partially open** — Experiments 8–11 show that the GABE basis subspace is not functionally neutral (2–3× energy elevation, p < 0.001 across H, F, GCM). However, subspace overlap with top eigenvectors is ≈ 0 in all cases, and the procedural contribution of SVD on same-shaped matrices cannot be fully excluded. The claim should be read as: *the subspace is geometrically meaningful, but not uniquely determined by training data*.
 
-**Key findings:**
-- Coefficients are **4× more fragile** than other components (pointer analogy confirmed)
-- Coefficients are **predictable from input** ($r = 0.927$)
-- **Dynamic addressing outperforms static weights** (98.2% vs. 72.0%)
-- Coefficients form **semantically meaningful clusters**
+4. **Router architecture** — Only simple MLPs were tested. Transformer-based or hypernetwork routers may improve $R^2$ and generalization.
 
-**Practical impact:**
-- **Optimization**: A new strategy to reduce redundancy by storing a shared memory and a compact addressing mechanism.
-- **Transfer learning**: Copy memory, retrain pointers
-- **Multi-task**: $O(N)$ memory scaling
-- **Continual learning**: Zero forgetting by freezing memory
+5. **Biological analogy** — The neuroscience parallels (hippocampus, prefrontal cortex, thalamus) are speculative and would require empirical validation with fMRI/EEG data.
 
-### 7.2 Future Directions
-
-**Immediate:**
-
-1. **LLM Application**
-   - Apply GABE to LLaMA/Mistral attention and FFN layers
-   - Measure: compression ratio, perplexity degradation, inference speed
-   - Expected: 5-20× compression on 7B models
-
-2. **Stable Diffusion Full UNet**
-   - Scale Router to entire UNet (not just test perturbations)
-   - Measure: FID score, prompt adherence, generation diversity
-   - Expected: $R^2 > 0.7$ for prompt → coefficients prediction
-
-3. **Weight-Space Editing Toolkit**
-   - Build interface: text prompt → coefficient space manipulation
-   - Applications: style transfer, concept mixing, fine-grained control
-   - Compare to: LoRA, textual inversion, prompt engineering
-
-**Medium-term:**
-
-4. **MANet Architecture Optimization**
-   - Hyperparameter search: basis count, Router architecture, compression ranks
-   - Benchmark: ImageNet, COCO, standard NLP datasets
-   - Target: Match static baselines with 10× fewer parameters
-
-5. **Biological Validation**
-   - Collaborate with neuroscientists
-   - Analyze fMRI/EEG data for addressing patterns
-   - Test predictions: stable populations, task-specific modulation
-
-6. **Lottery Ticket Investigation**
-   - Decompose winning vs. losing tickets with GABE
-   - Hypothesis: Winners have cleaner coefficient patterns
-   - Application: Use GABE to search for lottery tickets
-
-**Long-term:**
-
-7. **Unified Theory of Weight Sharing**
-   - Formal connection: GABE ↔ Universal Subspace Hypothesis ↔ Model Merging
-   - Goal: Prove necessary/sufficient conditions for shareable subspaces
-   - Impact: Principled design of multi-task/continual learning systems
-
-8. **Hardware-Optimized MANet**
-   - Co-design: GABE-aware training + specialized accelerators
-   - Target: Real-time dynamic weight generation on edge devices
-   - Metric: Energy efficiency vs. static networks
-
-### 7.3 Broader Impact
-
-**Positive:**
-- Democratization: Smaller models → broader access
-- Efficiency: Lower computational cost → reduced carbon footprint
-- Interpretability: Coefficient space analysis → better understanding of model behavior
-
-**Concerns:**
-- Malicious weight-space editing: Adversarial manipulation of coefficients
-- Privacy: Could coefficient patterns leak training data?
-- Dual use: Compression enables both beneficial (edge deployment) and harmful (easier deployment of problematic models) applications
-
-**Mitigation:**
-- Develop forensic tools: detect GABE-compressed models
-- Establish norms: responsible disclosure of weight-space editing techniques
-- Research: Robust training methods resistant to coefficient attacks
-
-### 7.4 Final Remarks
-
-GABE reveals a fundamental organizing principle in trained neural networks: **knowledge is stored not in independent weights, but in a hierarchical memory-addressed structure**. This discovery bridges computer science (addressable memory), neuroscience (memory systems), and machine learning (weight-space structure).
-
-The fact that coefficients are predictable from input ($r = 0.927$) and that dynamic addressing outperforms static weights (98.2% vs. 72.0%) suggests that conventional architectures may be suboptimal. Future neural networks might be designed from the ground up as memory-addressed systems, with explicit separation of:
-- What to remember ($\overline{W}$, $B_k$)
-- How to access it ($\alpha_i(x)$)
+6. **Dual-use concerns** — Coefficient-space editing could enable adversarial weight manipulation; coefficient patterns could potentially leak training data.
 
 ---
 
-### 8. Conclusion
-GABE reveals a fundamental organizing principle in trained neural networks: knowledge is stored in a hierarchical memory-addressed structure, not in independent weights. The decomposition into W̄ (shared data), B (address space), and αᵢ (pointers) is supported by three independent lines of evidence:
-- Physical: αᵢ is 2–250 bytes while W̄ and B are megabytes — a 3–4 order of magnitude asymmetry consistent with pointer semantics.
-- Fragility: αᵢ is 4–7× more sensitive to noise than W̄, exactly as broken pointers cause immediate system failure while corrupted data causes gradual degradation.
-- Universality: Basis CKA = 1.0 across architectures — the address space is universal and architecture-determined, not learned. The address space is hardware; the data and addresses are software.
+## Installation & Reproduction
 
-The practical implication is direct: N model variants sharing a common basis require only N × (2–250 bytes/layer) of additional storage beyond one base model — a lossless compression whose ratio grows linearly with N. This is not an approximation. It is a consequence of the factored structure that training implicitly produces.
-
----
-
-## Code & Reproducibility
-
-All code, trained routers, and experimental logs are available at:  
-**https://github.com/FekDN/GABE**
-
-Repository structure:
-```
-GABE/
-├── GABE.py                # Core decomposition implementation
-├── GABEtest1.py           # Tensor Recovery Test
-├── GABEtest2.py           # Correlation analysis
-├── GABEtest3.py           # Skill transfer
-├── GABEtest4.py           # Coefficient dependency
-├── GABEtest5.py           # Stable Diffusion fragility test
-├── GABEtest6.py           # Router training (all 3 sub-tests)
-├── GABEtest_intermodel.py # Inter-Model W̄ and Basis Comparison
-└── README.md              # Setup and reproduction instructions
-```
-
-To reproduce results:
 ```bash
 pip install torch torchvision diffusers transformers timm matplotlib scikit-learn
+git clone https://github.com/FekDN/GABE
+cd GABE
 ```
+
+| Script | Experiment |
+|--------|------------|
+| `GABE.py` | Core decomposition implementation |
+| `GABEtest1.py` | Tensor recovery test |
+| `GABEtest2.py` | Correlation analysis (Exp. 1) |
+| `GABEtest3.py` | Skill transfer (Exp. 2) |
+| `GABEtest4.py` | Coefficient dependency (Exp. 3) |
+| `GABEtest5.py` | Stable Diffusion fragility study (Exp. 4) |
+| `GABEtest6.py` | Router training — all 3 sub-tests (Exp. 5) |
+| `GABEtest_intermodel.py` | Inter-model basis universality (Exp. 6) |
+| `GABEtest_hessian.py` | Hessian alignment test (Exp. 8) — resolves CKA ambiguity |
+| `GABEtest_alignment_utils.py` | Shared utilities for Experiments 9–11 |
+| `GABEtest_fisher.py` | Fisher Information Matrix alignment (Exp. 9) |
+| `GABEtest_ntk.py` | Empirical NTK alignment (Exp. 10) — *CPU-intractable; requires GPU + torch.func.jvp* |
+| `GABEtest_gradcov.py` | Gradient Covariance Matrix alignment (Exp. 11) |
+
 ---
 
-**Dmitry Feklin**  
-FeklinDN@gmail.com  
-February 2026
+## Key Takeaways
 
-**License:** Apache 2.0  
+GABE's decomposition is supported by four independent lines of evidence, ordered from strongest to most interpretive:
 
+**1. Cross-matrix geometric consistency** *(most robust finding)*
+GABE basis directions carry 2–3× more energy than random directions across three matrices with different geometric meanings — Hessian (3.42×, loss curvature), Fisher IM (2.01×, output sensitivity), and Gradient Covariance (1.99×, gradient diversity). All effects are statistically significant (p < 0.001) with random baseline K/D = 0.000081. The consistency across matrices with different theoretical foundations makes coincidence an implausible explanation.
+
+> *The subspace is not functionally neutral: it occupies a statistically elevated curvature region across all tested geometries.*
+
+**2. Functional sensitivity hierarchy**
+$\alpha_i$ is 4–7× more sensitive to noise than $\overline{W}$ in Stable Diffusion perturbation experiments. The fragility ordering (coeffs > basis > mean) has partial geometric grounding in finding 1, though none of the tested matrices fully explains the magnitude of the gap.
+
+**3. Physical asymmetry**
+$\alpha_i$ is 2–250 bytes per layer while $\overline{W}$ and $B_k$ are megabytes — 3–4 orders of magnitude size difference consistent with pointer semantics. Small in storage, high in functional impact.
+
+**4. CKA = 1.0 across architectures** *(structurally useful, partially open)*
+The basis subspace is identical across models and training states. Whether this is purely procedural (SVD on same-shaped matrices) or data-driven remains partially open. Finding 1 provides indirect evidence it is non-trivial: if the subspace were a pure SVD artifact, its energy elevation would not be reproducible across H, F, and GCM.
+
+The memory-addressing analogy — $\overline{W}$ as RAM, $B_k$ as address space, $\alpha_i$ as pointers — is supported by these findings but remains illustrative. The geometric picture that emerges is: training implicitly concentrates functional structure into a low-dimensional inter-layer subspace that is elevated, but not dominant, in all tested functional geometries.
+
+---
+
+## Citation
+
+```bibtex
+@misc{feklin2026gabe,
+  title  = {GABE: Groupwise Affine Basis Encoding — Neural Networks as Memory-Addressed Systems},
+  author = {Feklin, Dmitry},
+  year   = {2026},
+  url    = {https://github.com/FekDN/GABE}
+}
+```
+
+**License:** Apache 2.0
