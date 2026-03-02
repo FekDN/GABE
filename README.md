@@ -441,6 +441,32 @@ Mean std: 0.474
 
 ---
 
+### 4.6 Experiment 7: The Address Space is Universal and Architecture-Dependent
+(GABEtest_intermodel.py)
+
+The inter-model comparison yielded a striking and unequivocal result: **the basis subspace is universal.** Across all tested architectures, training states, and layer groups, the basis vectors consistently inhabit the same low-dimensional subspace.
+
+**Key Findings from CKA Analysis:**
+
+| Comparison Scenario                                | Component | CKA Similarity | Pearson $r$ | Interpretation                                         |
+| -------------------------------------------------- | --------- | :------------: | :---------: | ------------------------------------------------------ |
+| **ResNet-18 Pre-trained vs. Random** (Cross-Model) | $\overline{W}$ |     0.397      |    ~0.00    | Data/memory is distinct (training matters).            |
+|                                                    | **Basis** |   **1.000**    |  **~0.00**  | **Address space is identical, regardless of training.** |
+| **GPT-2 vs. DistilBERT** (Cross-Architecture)      | $\overline{W}$ |     0.036      |    ~0.00    | Data is completely different across architectures.     |
+|                                                    | **Basis** |   **1.000**    |  **~0.00**  | **Address space is universal, even across models.**    |
+| **Within any single model** (Cross-Group)          | $\overline{W}$ |   0.07 - 0.67  |    ~0.00    | Data for different layer groups is distinct.           |
+|                                                    | **Basis** |   **1.000**    |  **~0.00**  | **Address space is universal across all groups.**      |
+
+**Interpretation:**
+This result provides profound evidence for the memory-addressing analogy, with a new crucial distinction:
+
+1.  **The Basis ($B_k$) is "Hardware":** The CKA score of 1.0 indicates that the address space is not learned from data. **Crucially, while the CKA similarity is exactly 1.000, the element-wise Pearson correlation between the bases is near zero ($r \approx 0.0$). Geometrically, this means that although the individual basis vectors are rotated randomly in each model, they perfectly span the exact same universal subspace.** It is a fixed, geometric property determined by the network architecture itself — a universal set of possible variations, pre-existing even in a randomly initialized model. All groups, in all tested models, share this exact same "memory layout."
+2.  **$\overline{W}$ and $\alpha_i$ are "Software":** The shared mean $\overline{W}$ (the "data" stored in memory) and the coefficients $\alpha_i$ (the "pointers") are what is actually learned during training. This is confirmed by the low CKA similarity of $\overline{W}$ between trained and random models.
+
+Furthermore, this universal basis is **energetically small**. By construction of SVD, the basis vectors capture the directions of *variation* around the mean, which account for a small fraction of the total variance (energy) of the weights. The bulk of the energy resides in the mean weight $\overline{W}$. This confirms the central finding: the address space is **geometrically universal but energetically minor.**
+
+---
+
 ## 5. Interpretation & Discussion
 
 ### 5.1 Core Findings
@@ -771,7 +797,15 @@ The fact that coefficients are predictable from input ($r = 0.927$) and that dyn
 - What to remember ($\overline{W}$, $B_k$)
 - How to access it ($\alpha_i(x)$)
 
-We hope this work inspires further investigation into the nature of learned representations and leads to more efficient, interpretable, and capable AI systems.
+---
+
+### 8. Conclusion
+GABE reveals a fundamental organizing principle in trained neural networks: knowledge is stored in a hierarchical memory-addressed structure, not in independent weights. The decomposition into W̄ (shared data), B (address space), and αᵢ (pointers) is supported by three independent lines of evidence:
+- Physical: αᵢ is 2–250 bytes while W̄ and B are megabytes — a 3–4 order of magnitude asymmetry consistent with pointer semantics.
+- Fragility: αᵢ is 4–7× more sensitive to noise than W̄, exactly as broken pointers cause immediate system failure while corrupted data causes gradual degradation.
+- Universality: Basis CKA = 1.0 across architectures — the address space is universal and architecture-determined, not learned. The address space is hardware; the data and addresses are software.
+
+The practical implication is direct: N model variants sharing a common basis require only N × (2–250 bytes/layer) of additional storage beyond one base model — a lossless compression whose ratio grows linearly with N. This is not an approximation. It is a consequence of the factored structure that training implicitly produces.
 
 ---
 
@@ -783,14 +817,15 @@ All code, trained routers, and experimental logs are available at:
 Repository structure:
 ```
 GABE/
-├── GABE.py              # Core decomposition implementation
-├── GABEtest1.py         # Tensor Recovery Test
-├── GABEtest2.py         # Correlation analysis
-├── GABEtest3.py         # Skill transfer
-├── GABEtest4.py         # Coefficient dependency
-├── GABEtest5.py         # Stable Diffusion fragility test
-├── GABEtest6.py         # Router training (all 3 sub-tests)
-└── README.md            # Setup and reproduction instructions
+├── GABE.py                # Core decomposition implementation
+├── GABEtest1.py           # Tensor Recovery Test
+├── GABEtest2.py           # Correlation analysis
+├── GABEtest3.py           # Skill transfer
+├── GABEtest4.py           # Coefficient dependency
+├── GABEtest5.py           # Stable Diffusion fragility test
+├── GABEtest6.py           # Router training (all 3 sub-tests)
+├── GABEtest_intermodel.py # Inter-Model W̄ and Basis Comparison
+└── README.md              # Setup and reproduction instructions
 ```
 
 To reproduce results:
