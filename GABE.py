@@ -26,30 +26,27 @@ class GABE:
         return w_bar, B_stacked, coeffs, original_shape
 
     def _compress_matrix(self, matrix: torch.Tensor, rank: int) -> Tuple[Tuple, torch.Tensor]:
-        """A universal function for compressing any 2D/3D matrix using the 'formula + remainder' method."""
-        is_batch = matrix.dim() == 3
-        # SVD works with batches (3D) or single matrices (2D)
-        U, S, Vh = torch.linalg.svd(matrix.to(torch.float64))
-        if is_batch:
-            U_r, S_r, Vh_r = U[..., :, :rank], S[..., :rank], Vh[..., :rank, :]
-            formula = (U_r @ torch.diag_embed(S_r) @ Vh_r).to(matrix.dtype)
-        else: # Single matrix
-            U_r, S_r, Vh_r = U[:, :rank], S[:rank], Vh[:rank, :]
-            formula = (U_r @ torch.diag(S_r) @ Vh_r).to(matrix.dtype)
+        """Compresses any N-D tensor by flattening to 2D, doing rank-r SVD, storing residual."""
+        original_shape = matrix.shape
+        rows = original_shape[0]
+        # Always flatten to (rows, flat_cols) -- handles 2D, 3D, 4D, 5D tensors uniformly
+        mat2d = matrix.to(torch.float64).reshape(rows, -1)
+        U, S, Vh = torch.linalg.svd(mat2d, full_matrices=False)
+        rank = min(rank, S.shape[0])
+        U_r, S_r, Vh_r = U[:, :rank], S[:rank], Vh[:rank, :]
+        formula = (U_r @ torch.diag(S_r) @ Vh_r).reshape(original_shape).to(matrix.dtype)
         residual = matrix - formula
         formulas = (U_r.to(matrix.dtype), S_r.to(matrix.dtype), Vh_r.to(matrix.dtype))
         return formulas, residual
 
     def _decompress_matrix(self, formulas: Tuple, residuals: torch.Tensor) -> torch.Tensor:
-        """Universal function for matrix restoration."""
+        """Restores a tensor from its SVD formulas and residual. Shape is inferred from residuals."""
         U_r, S_r, Vh_r = formulas
-        is_batch = U_r.dim() == 3
-        U_r_d, S_r_d, Vh_r_d = U_r.to(torch.float64), S_r.to(torch.float64), Vh_r.to(torch.float64)
-        if is_batch:
-            formula_double = U_r_d @ torch.diag_embed(S_r_d) @ Vh_r_d
-        else:
-            formula_double = U_r_d @ torch.diag(S_r_d) @ Vh_r_d
-        return formula_double.to(residuals.dtype) + residuals
+        U_r_d = U_r.to(torch.float64)
+        S_r_d = S_r.to(torch.float64)
+        Vh_r_d = Vh_r.to(torch.float64)
+        formula = (U_r_d @ torch.diag(S_r_d) @ Vh_r_d).reshape(residuals.shape).to(residuals.dtype)
+        return formula + residuals
 
     def _reconstruct_weights(self, w_bar: torch.Tensor, B: torch.Tensor, coeffs: torch.Tensor, original_shape: tuple) -> List[torch.Tensor]:
         num_layers = original_shape[0]
