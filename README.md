@@ -1110,7 +1110,7 @@ Training phase: SEQUENTIAL
 
 ### Exp 26b · ATen Group Chain vs span(B) and w̄
 
-**Script:** `tests/GABEtest_aten2.py`
+**Script:** `GABEtest_aten2.py`
 
 **Question:** Does the ATen operation chain of the computational graph, or the random seed (initialisation + data order), determine the similarity of GABE components across models?
 
@@ -1359,18 +1359,18 @@ cd GABE
 | `GABEtest_ntk.py` | **10** | Empirical NTK alignment *(CPU-intractable; requires GPU + torch.func.jvp)* |
 | `GABEtest_gradcov.py` | **11** | Gradient Covariance Matrix alignment |
 | `GABEtest_spectrum.py` | **12** | Spectral percentile analysis — CDF rank of GABE directions in H / F / GCM |
-| `tests/GABEtest_seed.py` | **13** | Seed reproducibility — 5 seeds × pairwise subspace alignment |
-| `tests/GABEtest_depth.py` | **14** | Depth sweep — elevation vs. L ∈ {2, 4} |
-| `tests/GABEtest_width.py` | **15** | Width sweep — elevation vs. C ∈ {16, 32, 64, 128} |
-| `tests/GABEtest_init.py` | **16** | Initialization control — spectral emergence over training |
-| `tests/GABEtest_layertype.py` | **17** | Cross-layer type — all ResNet-18 groups + GPT-2 |
-| `tests/GABEtest_finetune.py` | **19** | Fine-tuning drift — span(B) stability after domain shift |
-| `tests/GABEtest_alpha_edit2.py` | **20b** | α-editing with relative noise normalization (corrected) |
-| `tests/GABEtest_continual.py` | **21** | Continual learning chain — 5 binary tasks, GABE-CL vs FULL-FT |
-| `tests/GABEtest_crossarch.py` | **22** | Cross-architecture — ResNet-18, VGG-11, MobileNetV2 |
-| `tests/GABEtest_steering.py` | **24** | Steering vector overlap — class gradients vs span(B) |
-| `tests/GABEtest_dynamics.py` | **25** | Training dynamics — spectral and subspace convergence tracking |
-| `tests/GABEtest_aten2.py` | **26b** | ATen group chain vs span(B) and w̄ — seed vs op-chain as driver of universality |
+| `GABEtest_seed.py` | **13** | Seed reproducibility — 5 seeds × pairwise subspace alignment |
+| `GABEtest_depth.py` | **14** | Depth sweep — elevation vs. L ∈ {2, 4} |
+| `GABEtest_width.py` | **15** | Width sweep — elevation vs. C ∈ {16, 32, 64, 128} |
+| `GABEtest_init.py` | **16** | Initialization control — spectral emergence over training |
+| `GABEtest_layertype.py` | **17** | Cross-layer type — all ResNet-18 groups + GPT-2 |
+| `GABEtest_finetune.py` | **19** | Fine-tuning drift — span(B) stability after domain shift |
+| `GABEtest_alpha_edit2.py` | **20b** | α-editing with relative noise normalization (corrected) |
+| `GABEtest_continual.py` | **21** | Continual learning chain — 5 binary tasks, GABE-CL vs FULL-FT |
+| `GABEtest_crossarch.py` | **22** | Cross-architecture — ResNet-18, VGG-11, MobileNetV2 |
+| `GABEtest_steering.py` | **24** | Steering vector overlap — class gradients vs span(B) |
+| `GABEtest_dynamics.py` | **25** | Training dynamics — spectral and subspace convergence tracking |
+| `GABEtest_aten2.py` | **26b** | ATen group chain vs span(B) and w̄ — seed vs op-chain as driver of universality |
 
 ---
 
