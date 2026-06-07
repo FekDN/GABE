@@ -109,7 +109,7 @@ Across all architectures and widths tested, whenever $K \geq 3$:
 
 For practical PEFT and compression, **truncating to K = 2** is recommended. Including $B_3$ adds parameters and compute without capturing meaningful functional curvature.
 
-### 8. KV-Cache Routing Signal Confirmed, Compression Infeasible
+### 8. KV-Cache Routing Signal Confirmed, Static Compression Infeasible
 
 Activation-space GABE on GPT-2's KV cache degrades perplexity by **+628% at minimum** (K=6, 1.7× compression) — not viable. However, predicting $\alpha$ from the query $Q$ via a small router achieves **Pearson r = 0.905** (MSE 0.185× vs static baseline), confirming that KV-cache coefficients are highly predictable from input. Dynamic routing is viable; static compression is not.
 
@@ -188,7 +188,90 @@ Measure whether fine-tuning in GABE weight-space (frozen B) preserves safety beh
 
 ---
 
-## Summary Statistics
+## Beyond PEFT: GABE as a Native Tensor Format
+
+While GABE is highly effective for Parameter-Efficient Fine-Tuning (PEFT), its algebraic properties suggest a more radical direction. The dense weight matrix $W_i$ can be viewed as an over-parameterized artifact of how we initialize and train networks. GABE can be viewed as an alternative, structured storage format for deep neural networks.
+
+This opens a path to a **GABE-Native Backend**: treating the neural network layer mathematically as a sum of components, without ever materializing the dense matrices in memory.
+
+### 1. The Lossless Full-Rank Regime ($K = L - 1$)
+
+Under exact GABE decomposition (SVD in `float64`), a group of $L$ layers is represented with mathematically zero reconstruction error (Exp 32: `recon_err ≈ 1e-14`):
+
+$$W_i = \overline{W} + \sum_{k=1}^{L-1} \alpha_{ik} \cdot B_k$$
+
+**Storage cost:** For $L=32$ layers:
+```
+D (for W̄) + 31D (for B) + (32 × 31) (for α) ≈ 32D
+```
+At full rank, GABE provides **no static VRAM or checkpoint size reduction**. It takes exactly as much memory as the dense weights.
+
+**Compute / inference cost:** During autoregressive generation (batch size = 1, memory-bandwidth bound), computing $y = x W_i^T$ analytically expands to:
+$$y = x \overline{W}^T + \alpha_1 (x B_1^T) + \dots + \alpha_{31} (x B_{31}^T)$$
+The GPU must read 32 matrices ($\overline{W}$ and $B_{1..31}$) from HBM instead of 1 dense matrix $W_i$. Because intermediate operations (Attention, FFN) evict these from L2 cache between layers, they are re-fetched every forward pass. Result: a **32× bandwidth penalty** and severe inference slowdown.
+
+**Why bother with full-rank GABE natively?** Because of **training**. Even at full rank, if $B$ is frozen (as in FT-LM), the AdamW optimizer state collapses:
+```
+m(W̄), v(W̄)  →  2D
+m(α),  v(α)  →  negligible
+m(B),  v(B)  →  0  (frozen)
+```
+The optimizer footprint shrinks from $64D$ to $\approx 2D$ — a **32× reduction per group**. This enables training massive LLMs on consumer hardware without quantization, cleanly separating the "knowledge base" ($\overline{W}$) from the frozen architecture geometry ($B$). The 12.4× VRAM savings measured in FT-LM on GPT-2 is the empirical lower bound of this effect; at $K \ll L-1$ the theoretical ceiling is 32×.
+
+### 2. The Lossy Low-Rank Regime ($K = 2$)
+
+The calculus shifts dramatically if the "effective functional rank ≈ 2" hypothesis holds universally (Exp 12, 15, 32). If only $B_1$ and $B_2$ carry meaningful functional curvature, the basis can be truncated.
+
+**Storage cost:**
+```
+D (for W̄) + 2D (for B) + 64 (for α) ≈ 3D
+```
+Instead of $32D$, we allocate $3D$: a **~10.6× reduction** in static parameter footprint. A 70B parameter model checkpoint drops to ~14 GB, fitting on a single consumer GPU in `bfloat16` without destructive low-bit quantization.
+
+**Compute trade-off:** Inference now reads 3 matrices ($\overline{W}, B_1, B_2$) instead of 1 — a theoretical **3× inference slowdown** (bandwidth penalty) in exchange for 10.6× capacity. This is a classic capacity vs. latency trade-off, enabling models that would otherwise OOM.
+
+**The critical open question:** Does K=2 approximate inference quality sufficiently well on a *pretrained* model, without any fine-tuning? FT-CV and FT-LM show that frozen K=31 basis + updated $\overline{W}$ matches FULL_FT quality. Whether a *truncated* K=2 frozen basis is sufficient for zero-shot inference is untested and is the single most important open experiment in this direction.
+
+### The Four Levels of GABE Implementation
+
+#### Level 1 — Current GABE (On-the-fly Reconstruction)
+```
+W = W̄ + αB  →  Allocate W in VRAM  →  F.linear(x, W)  →  Free W
+```
+Allocating the dense $W$ dynamically causes memory fragmentation and high allocator overhead during training.
+
+#### Level 2 — GABE Tensor Primitive
+A custom Tensor class inside PyTorch:
+```cpp
+GABETensor { Wbar; B; alpha; }
+```
+Allows seamless architecture patching without modifying forward passes manually, but still relies on standard ATen ops underneath.
+
+#### Level 3 — Fused ATen Kernel *(The Inference Enabler)*
+Custom CUDA/Triton kernels for the K=2 regime:
+```cpp
+gabe_linear_forward(x, Wbar, B1, B2, alpha1, alpha2)
+```
+**Kernel fusion:** Instead of materializing $W$ (Read 3D → Write 1D → Read 1D for GEMM = 5D traffic), the fused kernel reads $\overline{W}, B_1, B_2$ directly into SRAM registers, computes the linear combination on the fly, multiplies with $x$, and writes only the output $y$. Memory traffic collapses to exactly 3D, eliminating VRAM thrashing.
+
+#### Level 4 — Fully GABE-Native Foundation Models
+Weights on HuggingFace Hub no longer exist as dense $L \times D$ matrices. The `.safetensors` format natively stores only $\{\overline{W}, B, \alpha\}$.
+
+If the low-rank structure ($K \ll L$) proves sufficient for high-quality zero-shot inference, GABE transitions from a fine-tuning method to a **fundamental structural representation** — sitting alongside Sparse and Quantized formats as a primary tool for model compression and serving.
+
+### What Needs to Be True
+
+This direction is viable only if three empirical conditions are confirmed:
+
+| Condition | Current evidence | What's needed |
+|-----------|:----------------:|:-------------:|
+| Rank-2 universal across all 7 Llama 3 8B groups and other families | 2/7 groups confirmed (Exp 32) | Full sweep: q/k/v/o/gate/up/down + Mistral/Gemma/Qwen |
+| K=2 truncation sufficient for zero-shot inference quality | Untested | Perplexity / downstream benchmark at K=2 vs dense |
+| Fused kernel faster than dense GEMM on A100/H100 | Theoretical only | CUDA/Triton benchmark across batch sizes |
+
+If all three hold, the significance of GABE shifts from "a useful PEFT technique" to "an alternative parameterization of deep neural networks" — comparable to quantization in scope, but operating on inter-layer structure rather than numerical precision.
+
+
 
 | Property | Value | Source |
 |----------|:-----:|--------|
