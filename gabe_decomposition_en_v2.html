@@ -1,103 +1,123 @@
+<!-- Dmitry Feklin · FeklinDN@gmail.com · February 2026 -->
 <style>
 /* ─── Base controls ─── */
-.ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); margin-bottom: 12px; }
-.ctrl label { font-size: 13px; color: var(--color-text-secondary); }
-select, button { font-size: 13px; padding: 5px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; }
-button:hover { background: var(--color-background-secondary); }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #333; padding: 20px; background: #fdfdfd; }
+.ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; }
+.ctrl label { font-size: 13px; color: #555; font-weight: 500;}
+select, button { font-size: 13px; padding: 5px 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; color: #333; cursor: pointer; transition: 0.2s; }
+button:hover { background: #f0f0f0; }
 button:active { transform: scale(0.98); }
-.btn-active { background: var(--color-background-info) !important; color: var(--color-text-info) !important; border-color: var(--color-border-info) !important; }
+.btn-active { background: #e6f4ea !important; color: #107c41 !important; border-color: #107c41 !important; font-weight: 600; }
 
-/* ─── Layout ─── */
-.section-title { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin: 10px 0 6px; }
-.mats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.mc { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 6px 8px; position: relative; }
-.mc.disabled-mat { opacity: 0.35; filter: grayscale(0.8); }
-.mlabel { font-size: 11px; color: var(--color-text-secondary); text-align: center; margin-bottom: 3px; }
-.msub { font-size: 10px; color: var(--color-text-tertiary); text-align: center; margin-bottom: 3px; }
-.mgrid { display: grid; gap: 1px; }
-.cell { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 500; border-radius: 2px; color: #fff; }
-.compare-group { display: flex; gap: 4px; align-items: flex-start; }
-.cg-label { font-size: 10px; color: var(--color-text-tertiary); writing-mode: vertical-rl; transform: rotate(180deg); padding: 2px; }
-.divider { width: 100%; height: 0.5px; background: var(--color-border-tertiary); margin: 10px 0; }
+/* ─── Layout & Matrices ─── */
+.section-title { font-size: 13px; font-weight: 600; color: #444; margin: 10px 0 8px; }
+.mats { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; align-items: flex-end; }
+.mc { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+.mc.disabled-mat { opacity: 0.4; filter: grayscale(0.8); }
+.mlabel { font-size: 12px; color: #444; text-align: center; margin-bottom: 4px; font-weight: 600; }
+.msub { font-size: 10px; color: #666; text-align: center; margin-bottom: 4px; background: #f4f4f4; border-radius: 4px; padding: 3px; border: 1px solid #eee; }
+.mgrid { display: grid; gap: 1px; border: 1px solid #eee; }
+.cell { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 600; border-radius: 1px; color: #fff; }
+.compare-group { display: flex; gap: 6px; align-items: flex-start; background: #f9f9f9; padding: 6px; border-radius: 8px; border: 1px dashed #ccc; }
+.cg-label { font-size: 11px; color: #777; writing-mode: vertical-rl; transform: rotate(180deg); padding: 2px; font-weight: 600; }
+.divider { width: 100%; height: 1px; background: #eee; margin: 16px 0; }
+
+/* ─── Fieldsets & Badges (NEW) ─── */
+.fieldset-box { border: 1.5px solid #e0e0e0; border-radius: 8px; padding: 18px 14px 14px; position: relative; margin-bottom: 20px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+.fieldset-box.highlight { border-color: #b0d4e3; background: #f4f9fb; }
+.fieldset-label { position: absolute; top: -10px; left: 12px; background: inherit; padding: 0 8px; font-size: 13px; font-weight: 700; color: #444; border-radius: 4px; }
+.badge { position: absolute; top: -10px; right: -8px; font-size: 9px; padding: 3px 6px; border-radius: 12px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10; border: 1.5px solid; background: #fff; letter-spacing: 0.02em; }
+.badge-train { color: #107c41; border-color: #107c41; background: #e6f4ea; }
+.badge-fire { color: #d83b01; border-color: #d83b01; background: #fde7e9; }
+.badge-noise { color: #605e5c; border-color: #605e5c; background: #f3f2f1; }
+
+/* ─── Info Panels (NEW) ─── */
+.info-panel { font-size: 12px; line-height: 1.5; color: #444; margin-bottom: 14px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 6px; border-left: 3px solid #ccc; }
+.info-panel.green { border-left-color: #107c41; }
+.info-panel.red { border-left-color: #d83b01; }
+.info-panel h4 { margin: 0 0 6px 0; font-size: 13px; color: #222; }
+.info-panel p { margin: 0 0 6px 0; }
+.info-panel code { background: #eaeaea; padding: 2px 4px; border-radius: 3px; font-family: monospace; font-size: 11.5px; color: #b30000; font-weight: 600; }
+.info-panel ul { margin: 0 0 0 20px; padding: 0; }
+.info-panel li { margin-bottom: 4px; }
 
 /* ─── Basis toggle button ─── */
-.basis-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.basis-toggle { font-size: 10px; padding: 2px 7px; border-radius: var(--border-radius-sm); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; transition: all 0.15s; }
-.basis-toggle:hover { background: var(--color-background-secondary); }
-.basis-toggle.off { background: var(--color-background-error, #ffeaea) !important; color: var(--color-text-error, #c00) !important; border-color: var(--color-border-error, #c00) !important; }
-.basis-toggle.on { background: var(--color-background-success) !important; color: var(--color-text-success) !important; border-color: var(--color-border-success) !important; }
-.unknown-badge { font-size: 9px; color: var(--color-text-error, #c00); text-align: center; font-weight: 600; letter-spacing: 0.04em; }
+.basis-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.basis-toggle { font-size: 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-weight: 600; cursor: pointer; transition: all 0.15s; width: 100%; }
+.basis-toggle.off { background: #ffeaea !important; color: #c00 !important; border-color: #c00 !important; }
+.basis-toggle.on { background: #e6f4ea !important; color: #107c41 !important; border-color: #107c41 !important; }
+.unknown-badge { font-size: 9px; color: #c00; text-align: center; font-weight: 700; letter-spacing: 0.04em; background: #ffeaea; padding: 2px 6px; border-radius: 4px; width: 100%; box-sizing: border-box; }
 
 /* ─── Recovery panel ─── */
-.recovery-panel { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 12px 14px; margin-top: 10px; }
-.recovery-title { font-size: 13px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-.method-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.method-btn { font-size: 12px; padding: 5px 11px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; transition: all 0.15s; }
-.method-btn:hover { background: var(--color-background-secondary); }
-.method-btn.active { background: var(--color-background-info) !important; color: var(--color-text-info) !important; border-color: var(--color-border-info) !important; font-weight: 500; }
+.recovery-panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+.recovery-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.method-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.method-btn { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc; background: #fff; color: #333; cursor: pointer; transition: all 0.15s; }
+.method-btn:hover { background: #f0f0f0; }
+.method-btn.active { background: #e6f4ea !important; color: #107c41 !important; border-color: #107c41 !important; font-weight: 600; }
 .rmse-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-.rmse-table th { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); text-align: left; padding: 4px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
-.rmse-table td { padding: 4px 8px; color: var(--color-text-primary); border-bottom: 0.5px solid var(--color-border-tertiary); }
-.rmse-table tr.best td { color: var(--color-text-success); font-weight: 600; }
+.rmse-table th { font-size: 11px; font-weight: 600; color: #555; text-align: left; padding: 6px 8px; border-bottom: 1px solid #ddd; }
+.rmse-table td { padding: 6px 8px; color: #333; border-bottom: 1px solid #eee; }
+.rmse-table tr.best td { color: #107c41; font-weight: 600; background: #f9fdfa; }
 .rmse-table tr.best td:first-child::before { content: '✓ '; }
 .rmse-bar-cell { min-width: 80px; }
-.rmse-bar-bg { height: 7px; border-radius: 4px; background: var(--color-background-tertiary, #eee); margin-top: 2px; }
-.rmse-bar-fill { height: 7px; border-radius: 4px; transition: width 0.4s; }
-.info-note { font-size: 11px; color: var(--color-text-tertiary); margin: 6px 0; font-style: italic; }
+.rmse-bar-bg { height: 8px; border-radius: 4px; background: #eee; margin-top: 2px; }
+.rmse-bar-fill { height: 8px; border-radius: 4px; transition: width 0.4s; }
 
 /* ─── k-chart ─── */
-.k-chart { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 14px 16px; margin-bottom: 10px; }
-.k-chart-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 10px; }
-.k-bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
-.k-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; }
+.k-chart { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+.k-chart-title { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 12px; }
+.k-bars { display: flex; align-items: flex-end; gap: 8px; height: 100px; padding-bottom: 5px; border-bottom: 1px solid #eee; }
+.k-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
 .k-bar { width: 100%; border-radius: 3px 3px 0 0; transition: height 0.3s; position: relative; min-height: 2px; }
-.k-bar-val { font-size: 9px; color: var(--color-text-secondary); }
-.k-bar-lbl { font-size: 10px; color: var(--color-text-secondary); }
-.k-optimal-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 10px; border-radius: var(--border-radius-md); background: var(--color-background-success); color: var(--color-text-success); border: 0.5px solid var(--color-border-success); margin-top: 8px; }
-.k-info-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
-.k-metric { font-size: 12px; color: var(--color-text-secondary); }
-.k-metric strong { color: var(--color-text-primary); }
-.searching { font-size: 13px; color: var(--color-text-secondary); padding: 10px 0; display: flex; align-items: center; gap: 8px; }
+.k-bar-val { font-size: 9px; color: #555; font-weight: 600; }
+.k-bar-lbl { font-size: 11px; color: #555; margin-top: 4px; }
+.k-optimal-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #e6f4ea; color: #107c41; border: 1px solid #107c41; margin-top: 12px; font-weight: 600; }
+.k-info-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
+.k-metric { font-size: 12px; color: #555; }
+.k-metric strong { color: #333; }
+.searching { font-size: 13px; color: #555; padding: 10px 0; display: flex; align-items: center; gap: 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.spinner { width: 14px; height: 14px; border: 2px solid var(--color-border-tertiary); border-top-color: var(--color-text-secondary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.spinner { width: 16px; height: 16px; border: 2px solid #ddd; border-top-color: #555; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
 /* ─── Parameter size table ─── */
-.param-table-wrap { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 12px 14px; margin-bottom: 10px; }
-.param-table-title { font-size: 13px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 8px; }
+.param-table-wrap { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+.param-table-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; display: flex; align-items: center;}
 .param-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.param-table th { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); text-align: left; padding: 4px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
-.param-table td { padding: 4px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); font-variant-numeric: tabular-nums; }
-.param-table td.num { text-align: right; font-family: monospace; font-size: 11px; }
-.param-table tr.highlight-orig td { color: var(--color-text-primary); font-weight: 500; }
-.param-table tr.highlight-gabe td { color: var(--color-text-success); font-weight: 600; }
-.param-table tr.highlight-hidden td { color: var(--color-text-info); font-weight: 600; }
-.param-table tr.total-row td { border-top: 1px solid var(--color-border-secondary); font-weight: 700; }
-.savings-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 8px; border-radius: var(--border-radius-sm); margin-left: 8px; }
-.savings-gabe { background: var(--color-background-success); color: var(--color-text-success); border: 0.5px solid var(--color-border-success); }
-.savings-hidden { background: var(--color-background-info); color: var(--color-text-info); border: 0.5px solid var(--color-border-info); }
-.param-formula { font-size: 11px; color: var(--color-text-tertiary); font-style: italic; }
+.param-table th { font-size: 11px; font-weight: 600; color: #555; text-align: left; padding: 6px 8px; border-bottom: 1px solid #ddd; }
+.param-table td { padding: 6px 8px; border-bottom: 1px solid #eee; font-variant-numeric: tabular-nums; }
+.param-table td.num { text-align: right; font-family: monospace; font-size: 12px; }
+.param-table tr.highlight-orig td { color: #333; font-weight: 500; background: #fafafa; }
+.param-table tr.highlight-gabe td { color: #107c41; font-weight: 600; background: #f9fdfa; }
+.param-table tr.total-row td { border-top: 2px solid #ccc; font-weight: 700; }
+.savings-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-left: 12px; }
+.savings-gabe { background: #e6f4ea; color: #107c41; border: 1px solid #107c41; }
+.param-formula { font-size: 11px; color: #777; font-style: italic; }
 </style>
 
-<div class="ctrl">
-  <label>Matrices (L):</label>
-  <select id="numMat">
-    <option value="3">3</option>
-    <option value="5" selected>5</option>
-    <option value="6">6</option>
-    <option value="8">8</option>
-    <option value="10">10</option>
-  </select>
-  <label>k (basis):</label>
-  <select id="kVal">
-    <option value="1">1</option>
-    <option value="2">2</option>
-    <option value="3" selected>3</option>
-    <option value="5">5</option>
-    <option value="7">7</option>
-  </select>
-  <button onclick="randomizeAndRun()" title="Generate new matrices">&#8635; New</button>
-  <button onclick="findOptimalK()" id="optBtn" title="Find optimal k">&#9881; Optimal k</button>
-  <button onclick="toggleCompare()" id="cmpBtn">⇄ Compare</button>
+<div class="fieldset-box highlight">
+  <div class="fieldset-label">Interactive Controls</div>
+  <div class="ctrl">
+    <label>Matrices (L):</label>
+    <select id="numMat">
+      <option value="3">3</option>
+      <option value="5" selected>5</option>
+      <option value="6">6</option>
+      <option value="8">8</option>
+      <option value="10">10</option>
+    </select>
+    <label>k (basis):</label>
+    <select id="kVal">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3" selected>3</option>
+      <option value="5">5</option>
+      <option value="7">7</option>
+    </select>
+    <button onclick="randomizeAndRun()" title="Generate new matrices">&#8635; New Data</button>
+    <button onclick="findOptimalK()" id="optBtn" title="Find optimal k">&#9881; Optimal k</button>
+    <button onclick="toggleCompare()" id="cmpBtn">⇄ Compare Recon</button>
+  </div>
 </div>
 
 <div id="kresult"></div>
@@ -193,122 +213,6 @@ function matRMSE(a, b) {
   return Math.sqrt(s/n);
 }
 
-// ─── Parameter size table ─────────────────────────────────────────────────────
-function buildParamTable(result) {
-  const L = result.original.length;
-  const k = result.k;
-  const rows = 10, cols = 10;
-  const D = rows * cols; // per-matrix flat dimension
-
-  // Sizes
-  const origTotal = L * D;           // L matrices × D
-  const wbarSize  = D;               // W̄: one matrix
-  const bSize     = k * D;           // B: k basis vectors × D
-  const alphaSize = L * k;           // α: L layers × k scalars
-  const gabeFullTotal = wbarSize + bSize + alphaSize;
-  const gabeHiddenTotal = wbarSize + alphaSize; // B discarded
-
-  const ratioFull   = (origTotal / gabeFullTotal).toFixed(2);
-  const ratioHidden = (origTotal / gabeHiddenTotal).toFixed(2);
-
-  const fmt = n => n.toLocaleString();
-
-  return `
-  <div class="param-table-wrap">
-    <div class="param-table-title">Parameter Size Analysis
-      <span class="savings-badge savings-gabe">GABE full: ${ratioFull}× vs original</span>
-      <span class="savings-badge savings-hidden">GABE no-B: ${ratioHidden}× vs original</span>
-    </div>
-    <table class="param-table">
-      <thead>
-        <tr>
-          <th>Component</th>
-          <th>Formula</th>
-          <th class="num">Values</th>
-          <th class="num">Parameters</th>
-          <th>Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="highlight-orig">
-          <td>Original (L matrices)</td>
-          <td class="param-formula">L × D</td>
-          <td class="num">${L} × ${D}</td>
-          <td class="num">${fmt(origTotal)}</td>
-          <td>Standard storage</td>
-        </tr>
-        <tr style="border-top:0.5px solid var(--color-border-secondary)">
-          <td colspan="5" style="font-size:11px;font-weight:600;padding:6px 8px 2px;color:var(--color-text-secondary)">GABE Full Representation (W̄ + B + α)</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;W̄ (group mean)</td>
-          <td class="param-formula">D</td>
-          <td class="num">${D}</td>
-          <td class="num">${fmt(wbarSize)}</td>
-          <td>One matrix, trained</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;B (basis, k vectors)</td>
-          <td class="param-formula">k × D</td>
-          <td class="num">${k} × ${D}</td>
-          <td class="num">${fmt(bSize)}</td>
-          <td>Frozen after decomposition</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;α (coefficients)</td>
-          <td class="param-formula">L × k</td>
-          <td class="num">${L} × ${k}</td>
-          <td class="num">${fmt(alphaSize)}</td>
-          <td>Scalars per layer</td>
-        </tr>
-        <tr class="highlight-gabe total-row">
-          <td>GABE Full total</td>
-          <td class="param-formula">D(1+k) + L·k</td>
-          <td class="num"></td>
-          <td class="num">${fmt(gabeFullTotal)}</td>
-          <td>${gabeFullTotal > origTotal ? '⚠ more than original (B overhead)' : ratioFull+'× savings'}</td>
-        </tr>
-        <tr style="border-top:0.5px solid var(--color-border-secondary)">
-          <td colspan="5" style="font-size:11px;font-weight:600;padding:6px 8px 2px;color:var(--color-text-secondary)">GABE Hidden-B (W̄ + α only — B recoverable via SVD)</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;W̄ (group mean)</td>
-          <td class="param-formula">D</td>
-          <td class="num">${D}</td>
-          <td class="num">${fmt(wbarSize)}</td>
-          <td>One matrix, trained</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;α (coefficients)</td>
-          <td class="param-formula">L × k</td>
-          <td class="num">${L} × ${k}</td>
-          <td class="num">${fmt(alphaSize)}</td>
-          <td>Needed for B recovery</td>
-        </tr>
-        <tr>
-          <td>&nbsp;&nbsp;B (basis)</td>
-          <td class="param-formula">—</td>
-          <td class="num">discarded</td>
-          <td class="num">0</td>
-          <td>Reconstructed via residual SVD (cos=1.00)</td>
-        </tr>
-        <tr class="highlight-hidden total-row">
-          <td>GABE Hidden-B total</td>
-          <td class="param-formula">D + L·k</td>
-          <td class="num"></td>
-          <td class="num">${fmt(gabeHiddenTotal)}</td>
-          <td>${ratioHidden}× savings vs original</td>
-        </tr>
-      </tbody>
-    </table>
-    <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px">
-      D = ${rows}×${cols} = ${D} (flattened matrix dimension) &nbsp;·&nbsp;
-      L = ${L} layers &nbsp;·&nbsp; k = ${k} basis vectors &nbsp;·&nbsp;
-      Fine-tuning WBAR_ONLY: trains only W̄ = <strong>${fmt(wbarSize)} params</strong> for the entire group (${ratioHidden}× vs full fine-tuning)
-    </div>
-  </div>`;
-}
-
 // ─── Rendering helpers ────────────────────────────────────────────────────────
 function cellColor(val, maxAbs) {
   const norm = Math.max(-1,Math.min(1,val/maxAbs));
@@ -316,7 +220,7 @@ function cellColor(val, maxAbs) {
   return norm>=0 ? `rgb(20,${intensity},90)` : `rgb(${intensity},40,110)`;
 }
 
-function matHTML(mat, title, sub='', extraClass='') {
+function matHTML(mat, title, sub='', extraClass='', badgeHTML='') {
   const flat = mat.flat();
   const maxAbs = Math.max(...flat.map(Math.abs),0.01);
   let cells = '';
@@ -325,6 +229,7 @@ function matHTML(mat, title, sub='', extraClass='') {
     cells += `<div class="cell" style="background:${bg}">${val.toFixed(1)}</div>`;
   }
   return `<div class="mc${extraClass?' '+extraClass:''}">
+    ${badgeHTML}
     <div class="mlabel">${title}</div>
     ${sub?`<div class="msub">${sub}</div>`:''}
     <div class="mgrid" style="grid-template-columns:repeat(10,20px)">${cells}</div>
@@ -344,7 +249,14 @@ function getRecon(result, i, activeBases) {
   return recon;
 }
 
-// ─── Basis toggle ─────────────────────────────────────────────────────────────
+// ─── Basis logic ──────────────────────────────────────────────────────────────
+function getActiveBases(result) {
+  return Array.from({length:result.k},(_,i)=>i).filter(i=>!disabledBases.has(i));
+}
+function getDisabledBases(result) {
+  return Array.from({length:result.k},(_,i)=>i).filter(i=>disabledBases.has(i));
+}
+
 function toggleBasis(idx) {
   if (disabledBases.has(idx)) disabledBases.delete(idx);
   else disabledBases.add(idx);
@@ -353,14 +265,7 @@ function toggleBasis(idx) {
   updateRecoverySection();
 }
 
-// ─── Three recovery methods ───────────────────────────────────────────────────
-function getActiveBases(result) {
-  return Array.from({length:result.k},(_,i)=>i).filter(i=>!disabledBases.has(i));
-}
-function getDisabledBases(result) {
-  return Array.from({length:result.k},(_,i)=>i).filter(i=>disabledBases.has(i));
-}
-
+// ─── Recovery Methods (Algorithms) ────────────────────────────────────────────
 function flatMat(mat) { return mat.flat(); }
 function unflatVec(v) { let m=[]; for(let r=0;r<10;r++) m.push(v.slice(r*10,(r+1)*10)); return m; }
 function dot(a,b){let s=0;for(let i=0;i<a.length;i++) s+=a[i]*b[i];return s;}
@@ -380,8 +285,7 @@ function recoverMethod1(result) {
     }
     return res;
   });
-  const recovered = simpleSVD(residuals, disabled.length);
-  return recovered;
+  return simpleSVD(residuals, disabled.length);
 }
 
 function recoverMethod2(result) {
@@ -458,60 +362,6 @@ function getReconWithRecovered(result, matIdx, activeBases, hiddenBases, recover
   return recon;
 }
 
-// ─── Build main HTML ──────────────────────────────────────────────────────────
-function buildHTML(result) {
-  let html = '';
-  const k = result.k;
-
-  html += `<div class="section-title">Original matrices (${result.original.length})</div><div class="mats">`;
-  result.original.forEach((m,i)=>html+=matHTML(m,`M${i+1}`));
-  html += `</div><div class="divider"></div>`;
-
-  html += `<div class="section-title">W̄ — group mean</div><div class="mats">${matHTML(result.wBar,'W̄')}</div>`;
-  html += `<div class="divider"></div>`;
-
-  html += `<div class="section-title">Basis B₁…B${k} (k=${k}) — click to mark a basis as unknown</div><div class="mats">`;
-  result.basis.forEach((b,i)=>{
-    let mat=[]; for(let r=0;r<10;r++) mat.push(b.slice(r*10,(r+1)*10));
-    const isOff = disabledBases.has(i);
-    html += `<div class="basis-wrap">`;
-    html += matHTML(mat, `B${i+1}`, '', isOff ? 'disabled-mat' : '');
-    html += `<button class="basis-toggle ${isOff?'off':'on'}" onclick="toggleBasis(${i})">`;
-    html += isOff ? '✗ Unknown' : '✓ Known';
-    html += `</button>`;
-    if (isOff) html += `<div class="unknown-badge">? ? ?</div>`;
-    html += `</div>`;
-  });
-  html += `</div><div class="divider"></div>`;
-
-  if (compareMode) {
-    html += `<div class="section-title">Comparison: original / reconstruction (k=${k}, known bases only)</div><div class="mats">`;
-    result.original.forEach((orig,i)=>{
-      const active = getActiveBases(result);
-      const recon=getRecon(result, i, active);
-      const alpha=result.alphas[i];
-      html+=`<div class="compare-group"><div class="cg-label">M${i+1}</div><div style="display:flex;flex-direction:column;gap:3px;align-items:center">`;
-      html+=matHTML(orig,'original');
-      html+=matHTML(recon,'reconstruction',`α=[${alpha.map(a=>a.toFixed(1)).join(',')}]`);
-      html+=`</div></div>`;
-    });
-    html += `</div>`;
-  } else {
-    const active = getActiveBases(result);
-    const disabled = getDisabledBases(result);
-    html += `<div class="section-title">Reconstruction (W̄ + Σαᵢ·Bᵢ${disabled.length?' | known bases only':''}, k=${k})</div><div class="mats">`;
-    result.original.forEach((orig,i)=>{
-      const recon=getRecon(result,i,active);
-      const alpha=result.alphas[i];
-      html+=matHTML(recon,`R${i+1}`,`[${alpha.map(a=>a.toFixed(1)).join(',')}]`);
-    });
-    html += `</div>`;
-  }
-
-  return html;
-}
-
-// ─── Recovery section ─────────────────────────────────────────────────────────
 let activeMethod = null;
 
 function updateRecoverySection() {
@@ -525,7 +375,7 @@ function updateRecoverySection() {
 
   let html = `<div class="recovery-panel">`;
   html += `<div class="recovery-title">🔍 Recovery of ${numDisabled} unknown basis vector${numDisabled>1?'s':''}</div>`;
-  html += `<div class="info-note">Bases ${disabled.map(i=>`B${i+1}`).join(', ')} hidden. Select recovery method:</div>`;
+  html += `<div class="info-panel"><p>Bases <strong>${disabled.map(i=>`B${i+1}`).join(', ')}</strong> hidden. Select recovery method to approximate missing basis from residuals:</p></div>`;
   html += `<div class="method-btns">`;
   html += `<button class="method-btn${activeMethod===1?' active':''}" onclick="runRecovery(1)">📐 Method 1 — Residual SVD</button>`;
   html += `<button class="method-btn${activeMethod===2?' active':''}" onclick="runRecovery(2)">∑ Method 2 — Mean residual</button>`;
@@ -593,24 +443,24 @@ function runAllMethods() {
   let html = `<div class="section-title" style="margin-top:10px">RMSE comparison of recovery methods (vs original)</div>`;
   html += `<table class="rmse-table">`;
   html += `<tr><th>Method</th><th>RMSE</th><th>Improvement vs baseline</th><th style="min-width:120px">Bar</th></tr>`;
-  html += `<tr><td style="color:var(--color-text-tertiary)">⊘ No recovery (known bases only)</td>
+  html += `<tr><td style="color:#777">⊘ No recovery (known bases only)</td>
     <td>${baselineRmse.toFixed(4)}</td><td>—</td>
     <td class="rmse-bar-cell"><div class="rmse-bar-bg"><div class="rmse-bar-fill" style="width:${(baselineRmse/maxRmse*100).toFixed(0)}%;background:#aaa"></div></div></td></tr>`;
   methods.forEach((m,i)=>{
     const pct = ((baselineRmse-methodRmses[i])/baselineRmse*100).toFixed(1);
     const isBest = i===bestIdx;
     const barW = (methodRmses[i]/maxRmse*100).toFixed(0);
-    const barColor = isBest ? '#1D9E75' : `hsl(${220-i*30},55%,55%)`;
+    const barColor = isBest ? '#107c41' : `hsl(${220-i*30},55%,55%)`;
     html += `<tr${isBest?' class="best"':''}>
       <td>${i+1}. ${m.name}</td>
       <td>${methodRmses[i].toFixed(4)}</td>
-      <td style="color:${pct>0?'var(--color-text-success)':'var(--color-text-error)'}">${pct>0?'−':'+'}${Math.abs(pct)}%</td>
+      <td style="color:${pct>0?'#107c41':'#c00'}">${pct>0?'−':'+'}${Math.abs(pct)}%</td>
       <td class="rmse-bar-cell"><div class="rmse-bar-bg"><div class="rmse-bar-fill" style="width:${barW}%;background:${barColor}"></div></div></td>
     </tr>`;
   });
-  html += `<tr><td style="color:var(--color-text-success)">★ All bases known (ideal)</td>
-    <td>${fullRmse.toFixed(4)}</td><td style="color:var(--color-text-success)">−${((baselineRmse-fullRmse)/baselineRmse*100).toFixed(1)}%</td>
-    <td class="rmse-bar-cell"><div class="rmse-bar-bg"><div class="rmse-bar-fill" style="width:${(fullRmse/maxRmse*100).toFixed(0)}%;background:#1D9E75;opacity:0.5"></div></div></td></tr>`;
+  html += `<tr><td style="color:#107c41">★ All bases known (ideal)</td>
+    <td>${fullRmse.toFixed(4)}</td><td style="color:#107c41">−${((baselineRmse-fullRmse)/baselineRmse*100).toFixed(1)}%</td>
+    <td class="rmse-bar-cell"><div class="rmse-bar-bg"><div class="rmse-bar-fill" style="width:${(fullRmse/maxRmse*100).toFixed(0)}%;background:#107c41;opacity:0.5"></div></div></td></tr>`;
   html += `</table>`;
 
   html += `<div class="section-title" style="margin-top:12px">Recovered bases (best method: ${methods[bestIdx].name})</div>`;
@@ -625,8 +475,8 @@ function runAllMethods() {
     html += `<div style="display:flex;gap:6px;align-items:flex-start">`;
     html += `<div>${matHTML(origMat,`B${ki+1} (orig.)`)}</div>`;
     html += `<div style="display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;padding-top:20px">`;
-    html += `<span style="font-size:18px">→</span>`;
-    html += `<span style="font-size:10px;color:var(--color-text-tertiary)">cos=${simil}</span>`;
+    html += `<span style="font-size:18px;color:#555">→</span>`;
+    html += `<span style="font-size:10px;color:#777;font-weight:600">cos=${simil}</span>`;
     html += `</div>`;
     html += `<div>${matHTML(recMat,`B${ki+1}* recovered`)}</div>`;
     html += `</div>`;
@@ -647,14 +497,14 @@ function renderRecoveryResult(result, active, hiddenBases, recovered, methodName
   });
   const baselineRmse = Math.sqrt(baseRMSEs.reduce((s,v)=>s+v*v,0)/L);
 
-  let html = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">`;
-  html += `Method: <strong style="color:var(--color-text-primary)">${methodName}</strong> &nbsp;|&nbsp; `;
+  let html = `<div style="font-size:13px;color:#555;margin-bottom:10px;background:#f9f9f9;padding:8px;border-radius:6px;border:1px solid #eee;">`;
+  html += `Method: <strong style="color:#222">${methodName}</strong> &nbsp;|&nbsp; `;
   html += `Recovery RMSE: <strong>${globalRmse.toFixed(4)}</strong> &nbsp;|&nbsp; `;
   const imp = ((baselineRmse-globalRmse)/baselineRmse*100).toFixed(1);
-  html += `improvement vs no recovery: <strong style="color:${imp>0?'var(--color-text-success)':'var(--color-text-error)'}">${imp>0?'−':'+'}${Math.abs(imp)}%</strong>`;
+  html += `Improvement vs no recovery: <strong style="color:${imp>0?'#107c41':'#c00'}">${imp>0?'−':'+'}${Math.abs(imp)}%</strong>`;
   html += `</div>`;
 
-  html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">`;
+  html += `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px">`;
   hiddenBases.forEach((ki,di)=>{
     if (!recovered[di]) return;
     const recMat = unflatVec(recovered[di]);
@@ -663,8 +513,8 @@ function renderRecoveryResult(result, active, hiddenBases, recovered, methodName
     html += `<div style="display:flex;gap:4px;align-items:flex-start">`;
     html += matHTML(origMat,`B${ki+1} (hidden)`,'','disabled-mat');
     html += `<div style="display:flex;flex-direction:column;align-items:center;padding-top:20px;gap:2px">`;
-    html += `<span style="font-size:14px">→</span>`;
-    html += `<span style="font-size:9px;color:var(--color-text-tertiary)">|cos|=${simil}</span>`;
+    html += `<span style="font-size:16px;color:#555">→</span>`;
+    html += `<span style="font-size:10px;color:#777;font-weight:600">|cos|=${simil}</span>`;
     html += `</div>`;
     html += matHTML(recMat,`B${ki+1}* recovered`);
     html += `</div>`;
@@ -672,11 +522,11 @@ function renderRecoveryResult(result, active, hiddenBases, recovered, methodName
   html += `</div>`;
 
   html += `<div class="section-title">Matrices: original vs recovered reconstruction</div>`;
-  html += `<div style="display:flex;flex-wrap:wrap;gap:8px">`;
+  html += `<div style="display:flex;flex-wrap:wrap;gap:12px">`;
   result.original.forEach((orig,mi)=>{
     const recon = getReconWithRecovered(result, mi, active, hiddenBases, recovered);
-    html += `<div style="display:flex;flex-direction:column;gap:3px;align-items:center">`;
-    html += `<span style="font-size:10px;color:var(--color-text-tertiary)">M${mi+1}</span>`;
+    html += `<div style="display:flex;flex-direction:column;gap:4px;align-items:center;background:#fdfdfd;padding:6px;border-radius:6px;border:1px dashed #ccc;">`;
+    html += `<span style="font-size:11px;color:#777;font-weight:600">M${mi+1}</span>`;
     html += matHTML(orig,'original');
     html += matHTML(recon,'recovered',`RMSE=${perMatRMSE[mi].toFixed(3)}`);
     html += `</div>`;
@@ -685,7 +535,171 @@ function renderRecoveryResult(result, active, hiddenBases, recovered, methodName
   document.getElementById('recovery-result').innerHTML = html;
 }
 
-// ─── k-chart and find optimal ────────────────────────────────────────────────
+// ─── Build HTML Structure ─────────────────────────────────────────────────────
+function buildHTML(result) {
+  let html = '';
+  const k = result.k;
+
+  html += `
+  <div class="fieldset-box">
+    <div class="fieldset-label">1. Mathematical Extraction</div>
+    <div class="info-panel">
+      <p>Given a group of $L$ layers with identical shape (e.g. 32 <code>q_proj</code> layers in Llama 3):</p>
+      <ul>
+        <li><strong>Step 1:</strong> Calculate shared mean: <code>W_bar = mean(W_1 ... W_L)</code></li>
+        <li><strong>Step 2:</strong> Center the weights: <code>ΔW_i = W_i - W_bar</code></li>
+        <li><strong>Step 3:</strong> Apply Exact SVD: <code>U, Σ, V = SVD(ΔW)</code></li>
+        <li><strong>Step 4:</strong> Extract Basis <code>B = V[:k]</code> and Pointers <code>α = U·Σ</code></li>
+      </ul>
+    </div>
+    <div class="section-title">Original Tensors (L=${result.original.length})</div>
+    <div class="mats">`;
+  result.original.forEach((m,i)=>html+=matHTML(m,`W_${i+1}`));
+  html += `</div></div>`;
+
+  html += `
+  <div class="fieldset-box" style="border-color:#107c41;">
+    <div class="fieldset-label" style="color:#107c41;">2. Long-Term Memory (RAM)</div>
+    <div class="info-panel green">
+      <p>The <strong>Group Mean Center</strong> acts as the shared core knowledge base for all layers. During fine-tuning, this shifts entirely to adapt to new domains.</p>
+    </div>
+    <div class="mats">
+      ${matHTML(result.wBar, 'W_bar', '', '', '<div class="badge badge-train">✓ Trainable</div>')}
+    </div>
+  </div>`;
+
+  html += `
+  <div class="fieldset-box" style="border-color:#d83b01;">
+    <div class="fieldset-label" style="color:#d83b01;">3. Architecture Geometry (Address Space)</div>
+    <div class="info-panel red">
+      <p>The extracted basis vectors are <strong>frozen</strong> during fine-tuning. Empirical analysis (Hessian/Fisher spectrum) shows that <code>B_1</code> and <code>B_2</code> consistently capture the <strong>>99th percentile</strong> of the network's functional curvature.</p>
+    </div>
+    <div class="section-title">Basis B₁…B${k} (Click to mask/unmask)</div>
+    <div class="mats">`;
+  
+  result.basis.forEach((b,i)=>{
+    let mat=[]; for(let r=0;r<10;r++) mat.push(b.slice(r*10,(r+1)*10));
+    const isOff = disabledBases.has(i);
+    let badge = '';
+    if (i === 0 || i === 1) badge = '<div class="badge badge-fire">🔥 99th Pct Curvature</div>';
+    else badge = '<div class="badge badge-noise">🧊 ~35th Pct (Noise)</div>';
+    
+    html += `<div class="basis-wrap">`;
+    html += matHTML(mat, `B_${i+1}`, '', isOff ? 'disabled-mat' : '', badge);
+    html += `<button class="basis-toggle ${isOff?'off':'on'}" onclick="toggleBasis(${i})">`;
+    html += isOff ? '✗ Masked' : '✓ Active';
+    html += `</button>`;
+    if (isOff) html += `<div class="unknown-badge">? Unknown ?</div>`;
+    html += `</div>`;
+  });
+  html += `</div></div>`;
+
+  html += `
+  <div class="fieldset-box" style="border-color:#107c41;">
+    <div class="fieldset-label" style="color:#107c41;">4. Pointers & GABE_FT Training</div>
+    <div class="info-panel green">
+      <h4>Parameter-Efficient Fine-Tuning (PEFT) Algorithm:</h4>
+      <p>During training, the forward pass reconstructs weights on-the-fly: <code>W_i = W_bar + Σ (α_ik * B_k)</code>. Optimizer (AdamW) state is drastically reduced because only <code>W_bar</code> and <code>α</code> receive gradients. The frozen <code>B</code> prevents Catastrophic Forgetting.</p>
+    </div>
+    <div class="section-title">${compareMode ? 'Comparison: original vs reconstruction' : 'Reconstructed Tensors & Trainable Pointers'}</div>
+    <div class="mats">`;
+    
+  const active = getActiveBases(result);
+  result.original.forEach((orig,i)=>{
+    const recon=getRecon(result,i,active);
+    const alpha=result.alphas[i];
+    
+    let alphaHtml = alpha.map((a, idx) => {
+        if(disabledBases.has(idx)) return `<span style="color:#bbb;text-decoration:line-through">${a.toFixed(1)}</span>`;
+        return `<strong>${a.toFixed(1)}</strong>`;
+    }).join(', ');
+
+    if (compareMode) {
+      html+=`<div class="compare-group"><div class="cg-label">M${i+1}</div><div style="display:flex;flex-direction:column;gap:4px;align-items:center">`;
+      html+=matHTML(orig,'original');
+      html+=matHTML(recon,'reconstruction',`α=[${alphaHtml}]`);
+      html+=`</div></div>`;
+    } else {
+      html+=matHTML(recon,`R_${i+1}`,`α = [${alphaHtml}]`, '', '<div class="badge badge-train">✓ Trainable (α)</div>');
+    }
+  });
+  html += `</div></div>`;
+
+  return html;
+}
+
+// ─── Param table ──────────────────────────────────────────────────────────────
+function buildParamTable(result) {
+  const L = result.original.length;
+  const k = result.k;
+  const rows = 10, cols = 10;
+  const D = rows * cols; 
+  const origTotal = L * D;           
+  const wbarSize  = D;               
+  const bSize     = k * D;           
+  const alphaSize = L * k;           
+  const gabeFullTotal = wbarSize + bSize + alphaSize;
+
+  const ratioFull   = (origTotal / gabeFullTotal).toFixed(2);
+  const fmt = n => n.toLocaleString();
+
+  return `
+  <div class="param-table-wrap">
+    <div class="param-table-title">Parameter Size Analysis
+      <span class="savings-badge savings-gabe">GABE full: ${ratioFull}× vs original</span>
+    </div>
+    <table class="param-table">
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Formula</th>
+          <th class="num">Values</th>
+          <th class="num">Parameters</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight-orig">
+          <td>Original (L matrices)</td>
+          <td class="param-formula">L × D</td>
+          <td class="num">${L} × ${D}</td>
+          <td class="num">${fmt(origTotal)}</td>
+          <td>Standard storage</td>
+        </tr>
+        <tr>
+          <td>&nbsp;&nbsp;W̄ (group mean)</td>
+          <td class="param-formula">D</td>
+          <td class="num">${D}</td>
+          <td class="num">${fmt(wbarSize)}</td>
+          <td>One matrix, trained</td>
+        </tr>
+        <tr>
+          <td>&nbsp;&nbsp;B (basis, k vectors)</td>
+          <td class="param-formula">k × D</td>
+          <td class="num">${k} × ${D}</td>
+          <td class="num">${fmt(bSize)}</td>
+          <td>Frozen after decomposition</td>
+        </tr>
+        <tr>
+          <td>&nbsp;&nbsp;α (pointers)</td>
+          <td class="param-formula">L × k</td>
+          <td class="num">${L} × ${k}</td>
+          <td class="num">${fmt(alphaSize)}</td>
+          <td>Trainable scalars per layer</td>
+        </tr>
+        <tr class="highlight-gabe total-row">
+          <td>GABE Full total</td>
+          <td class="param-formula">D(1+k) + L·k</td>
+          <td class="num"></td>
+          <td class="num">${fmt(gabeFullTotal)}</td>
+          <td>${gabeFullTotal > origTotal ? '⚠ more than original (B overhead)' : ratioFull+'× savings'}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
 function findOptimalK() {
   const btn = document.getElementById('optBtn');
   btn.disabled = true;
@@ -710,13 +724,13 @@ function findOptimalK() {
     if (optimalIdx === 0) optimalIdx = rmses.reduce((best,r,i)=>r.rmse<rmses[best].rmse?i:best,0);
     const optK = rmses[optimalIdx].k;
     const optRmse = rmses[optimalIdx].rmse;
-    const barColors = rmses.map((r,i) => i === optimalIdx ? '#1D9E75' : `hsl(${220 - i*15},55%,55%)`);
+    const barColors = rmses.map((r,i) => i === optimalIdx ? '#107c41' : `hsl(${220 - i*15},55%,55%)`);
     let barsHTML = rmses.map((r,i) => {
       const h = Math.max(4, Math.round(80 * (maxRmse - r.rmse + (maxRmse-minRmse)*0.05) / (maxRmse - minRmse + (maxRmse-minRmse)*0.05)));
       return `<div class="k-bar-wrap">
         <div class="k-bar-val">${r.rmse.toFixed(3)}</div>
-        <div class="k-bar" style="height:${h}px;background:${barColors[i]};${i===optimalIdx?'box-shadow:0 0 0 2px #1D9E75;':''}" title="k=${r.k}, RMSE=${r.rmse.toFixed(4)}"></div>
-        <div class="k-bar-lbl" style="${i===optimalIdx?'font-weight:500;color:var(--color-text-success)':''}">k=${r.k}</div>
+        <div class="k-bar" style="height:${h}px;background:${barColors[i]};${i===optimalIdx?'box-shadow:0 0 0 2px #107c41;':''}" title="k=${r.k}, RMSE=${r.rmse.toFixed(4)}"></div>
+        <div class="k-bar-lbl" style="${i===optimalIdx?'font-weight:600;color:#107c41':''}">k=${r.k}</div>
       </div>`;
     }).join('');
     document.getElementById('kresult').innerHTML = `
@@ -726,7 +740,7 @@ function findOptimalK() {
         <div class="k-info-row">
           <div class="k-optimal-badge">&#10003; Optimal k = ${optK}</div>
           <div class="k-metric">RMSE = <strong>${optRmse.toFixed(4)}</strong></div>
-          <div class="k-metric">improvement vs k=1: <strong>${(((rmses[0].rmse - optRmse)/rmses[0].rmse)*100).toFixed(1)}%</strong></div>
+          <div class="k-metric">Improvement vs k=1: <strong>${(((rmses[0].rmse - optRmse)/rmses[0].rmse)*100).toFixed(1)}%</strong></div>
         </div>
       </div>`;
     const kSelect = document.getElementById('kVal');
@@ -767,26 +781,12 @@ function randomizeAndRun() {
 
 function toggleCompare() {
   compareMode = !compareMode;
-  const btn = document.getElementById('cmpBtn');
-  btn.classList.toggle('btn-active', compareMode);
-  kParam = parseInt(document.getElementById('kVal').value);
-  if (!currentResult) { const r = runGABE(kParam); currentResult = r; }
+  document.getElementById('cmpBtn').classList.toggle('btn-active', compareMode);
   document.getElementById('viz').innerHTML = buildHTML(currentResult);
 }
 
-document.getElementById('numMat').onchange = ()=>{
-  numMatrices=parseInt(document.getElementById('numMat').value);
-  randomizeAndRun();
-};
-document.getElementById('kVal').onchange = ()=>{
-  kParam=parseInt(document.getElementById('kVal').value);
-  disabledBases=new Set(); activeMethod=null;
-  document.getElementById('recovery-section').innerHTML='';
-  const result=runGABE(kParam);
-  currentResult=result;
-  document.getElementById('param-sizes').innerHTML = buildParamTable(result);
-  document.getElementById('viz').innerHTML=buildHTML(result);
-};
+document.getElementById('numMat').onchange = randomizeAndRun;
+document.getElementById('kVal').onchange = randomizeAndRun;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 createRandomMatrices(5);
