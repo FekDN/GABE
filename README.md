@@ -3,7 +3,7 @@
 
 **Dmitry Feklin** · FeklinDN@gmail.com · 2026
 
-> For full experiment logs, methodology, caveats, and raw numbers — see [Readme.md](./Readme.md).
+> For full experiment logs, methodology, caveats, and raw numbers — see [Readme.md](./READMEfull.md).
 
 ---
 
